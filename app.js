@@ -304,8 +304,66 @@ if(id==='verification')return `<section class='print-section'><h2>Rapporto verif
 if(id==='projects'){projectStore();if(!hasProjectData())return '';return `<section class='print-section'><h2>Progettisti e progetti</h2>${printableTable(['Progettista','Ordine / Collegio','Iscrizione','Contatto'],state.designers.map(x=>[x.name,x.order,x.number,x.contact]))}${printableTable(['Progetto','Progettista','Revisione','Data','File registrati'],state.projects.map(x=>[x.title,x.designer,x.revision,x.date,(x.files||[]).join(', ')]))}<p class='notice'>I file sono elencati per nome e devono essere allegati separatamente. Verificare gli elaborati e le firme professionali richieste.</p></section>`}
 if(id==='attachments')return '';return ''}
 function ministerialDico(){
- const e=x=>esc(x||'________________________'),loc=[state.address,state.city,state.province].filter(Boolean).join(', '),firm=state.issuerTechnician||state.technician;
- return `<section class='print-section ministerial-dico'><div style='text-align:right;font-size:9pt'>D.M. 37/2008 · Allegato I · BOZZA DA COMPLETARE E VERIFICARE</div><h2>DICHIARAZIONE DI CONFORMITÀ DELL’IMPIANTO ALLA REGOLA DELL’ARTE</h2><p>Il sottoscritto <strong>${e(firm)}</strong>, in qualità di titolare o legale rappresentante dell’impresa <strong>${e(state.issuerCompany||state.company)}</strong>, con sede in <strong>${e(state.companyAddress||"__________________________")}</strong>, P. IVA <strong>${e(state.companyVat||"__________________________")}</strong>, iscritta al Registro delle Imprese / Albo imprese artigiane di <strong>${e(state.registryOffice||"__________________________")}</strong>, n. <strong>${e(state.registryNumber||"__________________________")}</strong>, esecutrice dell’impianto sotto descritto,</p><p><b>COMMITTENTE:</b> ${e(state.client)} · CF/P.IVA: ${e(state.clientTax)}</p><p><b>IMMOBILE:</b> ${e(loc)} · Destinazione d’uso: ${e(state.use)}</p><p><b>INTERVENTO:</b> ${e(state.work)} · ${e(state.workDescription)}</p><p><b>TIPOLOGIA:</b> impianto elettrico · ${e(state.phase)} · ${e(state.voltage)} · sistema ${e(state.earth)}</p><h3>DICHIARA</h3><p>Sotto la propria personale responsabilità, che l’impianto è stato realizzato in modo conforme alla regola dell’arte, ai sensi dell’art. 7 del D.M. 37/2008, tenuto conto delle condizioni di esercizio e degli usi cui è destinato l’edificio.</p><p>In particolare, dichiara di avere rispettato il progetto ove previsto, seguito la normativa tecnica applicabile, installato componenti idonei, controllato l’impianto ai fini della sicurezza e della funzionalità con esito positivo.</p><h3>Allegati obbligatori da verificare e unire</h3><p>☐ Progetto ai sensi degli artt. 5 e 7 · ☐ Relazione con tipologie dei materiali utilizzati · ☐ Schema dell’impianto realizzato · ☐ Riferimento a dichiarazioni di conformità precedenti o parziali · ☐ Copia del certificato di riconoscimento dei requisiti tecnico-professionali.</p><p><b>Allegati facoltativi:</b> ${e((state.attachments||[]).join('; '))}</p><p><b>Data:</b> ${e(state.dicoDate||"__________________")} &nbsp;&nbsp; <b>Luogo:</b> ${e(state.dicoPlace||"__________________")}</p><div class='print-signature'><span>Firma del dichiarante<i></i></span></div><p class='notice' style='font-size:8pt'>BOZZA OPERATIVA: non è una riproduzione certificata del modulo ministeriale. Prima dell’emissione verificare testo, dichiarazioni, dati identificativi, eventuali esclusioni, firme e allegati con il modello vigente. Questa sezione è predisposta per le Di.Co. di imprese installatrici; non utilizzare come Di.Ri.</p></section>`
+const m=state.vtV1910?.ministerial||{};
+ const e=x=>esc(x||'________________________'),loc=[state.address,state.city,state.province].filter(Boolean).join(', '),firm=m.representative||state.issuerTechnician||state.technician;
+ return `<section class='print-section ministerial-dico'><div style='text-align:right;font-size:9pt'>D.M. 37/2008 · Allegato I · BOZZA DA COMPLETARE E VERIFICARE</div><h2>DICHIARAZIONE DI CONFORMITÀ DELL’IMPIANTO ALLA REGOLA DELL’ARTE</h2><p>Il sottoscritto <strong>${e(firm)}</strong>, in qualità di titolare o legale rappresentante dell’impresa <strong>${e(state.issuerCompany||state.company)}</strong>, con sede in <strong>${e((m.headOffice||state.companyAddress)||"__________________________")}</strong>, P. IVA <strong>${e(state.companyVat||"__________________________")}</strong>, iscritta al Registro delle Imprese / Albo imprese artigiane di <strong>${e((m.regOffice||state.registryOffice)||"__________________________")}</strong>, n. <strong>${e((m.regNo||state.registryNumber)||"__________________________")}</strong>, esecutrice dell’impianto sotto descritto,</p><p><b>COMMITTENTE:</b> ${e(state.client)} · CF/P.IVA: ${e(state.clientTax)}</p><p><b>IMMOBILE:</b> ${e(loc)} · Destinazione d’uso: ${e(state.use)}</p><p><b>INTERVENTO:</b> ${e(state.work)} · ${e(state.workDescription)}</p><p><b>TIPOLOGIA:</b> impianto elettrico · ${e(state.phase)} · ${e(state.voltage)} · sistema ${e(state.earth)}</p>
+
+${m.sector?`<p><b>Settore di attività:</b> ${e(m.sector)}</p>`:''}
+${m.owner?`<p><b>Proprietario:</b> ${e(m.owner)}</p>`:''}
+${m.projectAuthor?`<p><b>Progettista:</b> ${e(m.projectAuthor)}</p>`:''}
+${m.technicalStandard?`<p><b>Norme tecniche applicate:</b> ${e(m.technicalStandard)}</p>`:''}
+<h3>DICHIARA</h3>
+<p>Sotto la propria responsabilità, che l'impianto è stato
+realizzato secondo la regola dell'arte, ai sensi dell'art. 6
+del D.M. 37/2008, considerate le condizioni di esercizio
+e la destinazione dell'edificio.</p>
+
+<p>In particolare, dichiara di avere:</p>
+<ul style="margin:3px 0 6px 18px;padding:0">
+<li>rispettato il progetto, nei casi previsti dall'art. 5;</li>
+<li>seguito le norme tecniche applicabili all'impianto;</li>
+<li>installato componenti e materiali idonei al luogo;</li>
+<li>effettuato con esito positivo i controlli di sicurezza
+e funzionalità richiesti dalle disposizioni applicabili.</li>
+</ul>
+
+<h3>Allegati obbligatori da verificare e unire</h3>
+<p>□ Progetto ai sensi degli artt. 5 e 7;<br>
+□ Relazione sulle tipologie dei materiali utilizzati;<br>
+□ Schema dell'impianto realizzato;<br>
+□ Riferimenti a dichiarazioni precedenti o parziali;<br>
+□ Certificato dei requisiti tecnico-professionali.</p>
+
+<p><b>Allegati facoltativi:</b>
+${e((state.attachments||[]).join('; '))}</p>
+
+<h3>DECLINA</h3>
+<p>Ogni responsabilità per sinistri a persone o cose
+derivanti da manomissioni dell'impianto da parte di terzi
+o da carenze di manutenzione o riparazione.</p>
+
+<p><b>Data:</b> ${e(state.dicoDate)}
+&nbsp;&nbsp; <b>Luogo:</b> ${e(state.dicoPlace)}</p>
+
+<div style="display:flex;gap:10mm;justify-content:space-between">
+<div style="width:48%;text-align:center">
+<b>Il responsabile tecnico</b>
+<p>${e(state.technician)}</p>
+<div style="height:13mm"></div>
+</div>
+<div style="width:48%;text-align:center">
+<b>Il dichiarante</b>
+<p>${e(firm)}</p>
+<div style="height:13mm"></div>
+</div>
+</div>
+
+<p style="font-size:8pt">
+<b>Avvertenze per il committente:</b>
+obblighi del committente e del proprietario secondo
+l'art. 8 del D.M. 37/2008.
+</p>
+<p class='notice' style='font-size:8pt'>BOZZA OPERATIVA: non è una riproduzione certificata del modulo ministeriale. Prima dell’emissione verificare testo, dichiarazioni, dati identificativi, eventuali esclusioni, firme e allegati con il modello vigente. Questa sezione è predisposta per le Di.Co. di imprese installatrici; non utilizzare come Di.Ri.</p></section>`
 }
 let printIds=[];
 async function printDocuments(ids){save(false);printIds=ids.filter(id=>id!=='ministerial'||state.doc==='Di.Co.').filter(id=>id!=='projects'||hasProjectData()).filter(id=>id!=='attachments'||attachmentMeta().length>0);const missing=[['Cliente',state.client],['Ubicazione',state.address],['Responsabile tecnico',state.technician]].filter(([,x])=>!String(x||'').trim()).map(([x])=>x);if(missing.length&&!confirm('Attenzione: dati mancanti ('+missing.join(', ')+'). Vuoi generare comunque una BOZZA di stampa?'))return;
@@ -328,6 +386,22 @@ const html=`<!doctype html><html lang='it'><head><meta charset='utf-8'><title>${
   .template-cover{page:copertina;width:210mm!important;height:297mm!important;}
   .index-page{page:indice;break-before:page;}
   .print-section{page:auto;break-before:page;padding-bottom:5mm}
+.print-section.ministerial-dico{
+  font-size:10.5pt;
+  line-height:1.22;
+  padding-top:0;
+  padding-bottom:1mm;
+}
+.print-section.ministerial-dico p{
+  margin-top:3px;
+  margin-bottom:3px;
+}
+.print-section.ministerial-dico h2,
+.print-section.ministerial-dico h3{
+  margin-top:5px;
+  margin-bottom:5px;
+}
+
   .doc-footer{display:none!important}
 }
 .print-signature{margin-top:14mm;padding-top:4mm;border-top:1px solid #b5bec7;
