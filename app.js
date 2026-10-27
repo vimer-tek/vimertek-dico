@@ -136,18 +136,44 @@ function schemaItems(){if(!Array.isArray(state.schemaItems))state.schemaItems=(s
 function schemaGeneral(){if(!state.schemaGeneral){let q=(state.circuits||[]).find(c=>/^(QG|GENERALE|QUADRO GENERALE)$/i.test((c.name||'').trim()));state.schemaGeneral={name:'QG',prot:q?.prot||''}}return state.schemaGeneral}
 function schemaGroups(){return state.schemaGroups||(state.schemaGroups=[])}
 function schemaBoards(){return state.schemaBoards||(state.schemaBoards=[])}
-function schemaEdit(i,k,v){schemaItems()[i][k]=v;save(false);refreshSchema()}
-function schemaEditGeneral(k,v){schemaGeneral()[k]=v;save(false);refreshSchema()}
-function schemaMove(i,d){let a=schemaItems(),j=i+d;if(j<0||j>=a.length)return;[a[i],a[j]]=[a[j],a[i]];save(false);render()}
-function schemaAdd(){schemaItems().push({name:'Nuovo circuito',prot:'',cable:'',dest:'',group:'',board:'QG',device:'MT'});save(false);render()}
-function schemaRemove(i){if(!confirm('Rimuovere la partenza dallo schema? Il circuito originale resta nella pratica.'))return;schemaItems().splice(i,1);save(false);render()}
-function schemaAddGroup(){let id='DG'+(schemaGroups().length+1);schemaGroups().push({id,name:id,prot:'',board:'QG'});save(false);render()}
-function schemaEditGroup(i,k,v){schemaGroups()[i][k]=v;save(false);render()}
-function schemaRemoveGroup(i){let id=schemaGroups()[i].id;schemaItems().forEach(c=>{if(c.group===id)c.group=''});schemaGroups().splice(i,1);save(false);render()}
-function schemaAddBoard(){let id='QS'+(schemaBoards().length+1);schemaBoards().push({id,name:id,feed:'',cable:''});save(false);render()}
-function schemaEditBoard(i,k,v){schemaBoards()[i][k]=v;save(false);render()}
-function schemaRemoveBoard(i){let id=schemaBoards()[i].id;schemaItems().forEach(c=>{if(c.board===id)c.board='QG'});schemaGroups().forEach(g=>{if(g.board===id)g.board='QG'});schemaBoards().splice(i,1);save(false);render()}
-function schemaRegenerate(){if(!confirm('Rigenerare dai circuiti? Le modifiche manuali, i gruppi e i quadri secondari saranno sostituiti.'))return;delete state.schemaItems;delete state.schemaGeneral;state.schemaGroups=[];state.schemaBoards=[];schemaItems();schemaGeneral();save(false);render()}
+// La revisione è attestata manualmente dal tecnico, mai dedotta dal software.
+function schemaIsReviewed(){
+  const g=schemaGeneral(), a=schemaItems();
+  return state.schemaValidated==='Si' && !!String(g.prot||'').trim() &&
+         a.length>0 && a.every(c=>String(c.prot||'').trim() && String(c.cable||'').trim());
+}
+function schemaInvalidate(){state.schemaValidated='';state.schemaValidatedOn=''}
+function schemaMarkReviewed(value){
+  if(value!=='Si'){schemaInvalidate();save(false);render();return;}
+  const g=schemaGeneral(),a=schemaItems();
+  const missing=[];
+  if(!String(g.prot||'').trim()) missing.push('Protezione generale QG / protezione a monte');
+  if(!a.length) missing.push('Nessuna partenza registrata nello schema');
+  const bad=a.filter(c=>!String(c.prot||'').trim()||!String(c.cable||'').trim());
+  if(bad.length) missing.push(bad.length+' circuiti privi di protezione o cavo');
+  if(missing.length){
+    alert('Prima della validazione completa questi dati:\n\n• '+missing.join('\n• '));
+    render();return;
+  }
+  if(!confirm('Confermi di aver confrontato personalmente lo schema con l’impianto realmente eseguito, controllato protezioni, collegamenti, sezioni e selettività? La conferma non sostituisce la firma del tecnico.')){
+    render();return;
+  }
+  state.schemaValidated='Si';
+  state.schemaValidatedOn=new Date().toISOString().slice(0,10);
+  save(false);render();
+}
+function schemaEdit(i,k,v){schemaItems()[i][k]=v;schemaInvalidate();save(false);refreshSchema()}
+function schemaEditGeneral(k,v){schemaGeneral()[k]=v;schemaInvalidate();save(false);refreshSchema()}
+function schemaMove(i,d){let a=schemaItems(),j=i+d;if(j<0||j>=a.length)return;[a[i],a[j]]=[a[j],a[i]];schemaInvalidate();save(false);render()}
+function schemaAdd(){schemaItems().push({name:'Nuovo circuito',prot:'',cable:'',dest:'',group:'',board:'QG',device:'MT'});schemaInvalidate();save(false);render()}
+function schemaRemove(i){if(!confirm('Rimuovere la partenza dallo schema? Il circuito originale resta nella pratica.'))return;schemaItems().splice(i,1);schemaInvalidate();save(false);render()}
+function schemaAddGroup(){let id='DG'+(schemaGroups().length+1);schemaGroups().push({id,name:id,prot:'',board:'QG'});schemaInvalidate();save(false);render()}
+function schemaEditGroup(i,k,v){schemaGroups()[i][k]=v;schemaInvalidate();save(false);render()}
+function schemaRemoveGroup(i){let id=schemaGroups()[i].id;schemaItems().forEach(c=>{if(c.group===id)c.group=''});schemaGroups().splice(i,1);schemaInvalidate();save(false);render()}
+function schemaAddBoard(){let id='QS'+(schemaBoards().length+1);schemaBoards().push({id,name:id,feed:'',cable:''});schemaInvalidate();save(false);render()}
+function schemaEditBoard(i,k,v){schemaBoards()[i][k]=v;schemaInvalidate();save(false);render()}
+function schemaRemoveBoard(i){let id=schemaBoards()[i].id;schemaItems().forEach(c=>{if(c.board===id)c.board='QG'});schemaGroups().forEach(g=>{if(g.board===id)g.board='QG'});schemaBoards().splice(i,1);schemaInvalidate();save(false);render()}
+function schemaRegenerate(){if(!confirm('Rigenerare dai circuiti? Le modifiche manuali, i gruppi e i quadri secondari saranno sostituiti.'))return;delete state.schemaItems;delete state.schemaGeneral;state.schemaGroups=[];state.schemaBoards=[];schemaItems();schemaGeneral();schemaInvalidate();save(false);render()}
 function schemaSelect(value,options,fn){return `<select onchange='${fn}'>${options.map(([v,t])=>`<option value="${escAttr(v)}" ${value===v?'selected':''}>${esc(t)}</option>`).join('')}</select>`}
 const SCHEMA_DEVICE_CATALOG=[
  ['Protezione',['MT','Magnetotermico'],['MTD','Magnetotermico differenziale'],['ID','Differenziale puro'],['MCCB','Interruttore scatolato'],['ACB','Interruttore aperto'],['MOT','Salvamotore'],['RTH','Relè termico']],
@@ -256,7 +282,7 @@ function unifilarSVGLegacy(){
  const height=signatureY+signatureH+34;
  const signedBy=state.technician||state.issuerTechnician||'Da compilare';
  const signatureBlock=`<rect x="${signatureX}" y="${signatureY}" width="${signatureW}" height="${signatureH}" fill="white" stroke="#24344c" stroke-width="1.5"/>${label(signatureX+18,signatureY+25,'FIRMA DEL DIRETTORE TECNICO',12,'start',true)}${label(signatureX+18,signatureY+49,`Nominativo: ${signedBy}`,11,'start')}${label(signatureX+18,signatureY+78,'Firma:',11,'start')}<path d="M${signatureX+82} ${signatureY+123} L${signatureX+signatureW-20} ${signatureY+123}" stroke="#24344c" stroke-width="1.2" fill="none"/>${label(signatureX+18,signatureY+145,'Data: ____/____/________',10,'start')}`;
- return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" role="img" aria-label="Schema unifilare preliminare"><rect x="1" y="1" width="${width-2}" height="${height-2}" fill="white" stroke="#263442"/>${label(25,29,`SCHEMA UNIFILARE · ${state.practiceNo||''}`,17,'start',true)}${label(25,51,`Sistema ${state.earth||''} · ${state.phase||''} · ${state.voltage||''} · ${state.power||''} kW`,11,'start')}${sections.join('')}${signatureBlock}${label(25,height-16,'VIMER TEK · Schema preliminare da verificare e validare tecnicamente',10,'start')}</svg>`;
+ return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" role="img" aria-label="Schema unifilare"><rect x="1" y="1" width="${width-2}" height="${height-2}" fill="white" stroke="#263442"/>${label(25,29,`SCHEMA UNIFILARE · ${state.practiceNo||''}`,17,'start',true)}${label(25,51,`Sistema ${state.earth||''} · ${state.phase||''} · ${state.voltage||''} · ${state.power||''} kW`,11,'start')}${sections.join('')}${signatureBlock}${label(25,height-16,schemaIsReviewed()?'VIMER TEK · Schema controllato dal responsabile tecnico':'VIMER TEK · Verificare collegamenti, protezioni e sezioni',10,'start')}</svg>`;
 }
 // VT_UNIFILARE_GERARCHICO_V1910B - configurazione QPT / QPP / Giardino.
 // La topologia a tre rami si attiva SOLO quando QPT-07/08/09 sono presenti
@@ -416,7 +442,7 @@ function unifilarSVG(onlyBoard=''){
   }
   // Deliberately do not draw duplicate 'virtual' feeder nodes as independent devices.
   const H=y+28;
-  const svg=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="Schema preliminare ${safe(board.name||id)}"><rect x="1" y="1" width="${W-2}" height="${H-2}" fill="white" stroke="#263442"/>${s}${text(28,H-13,'VIMER TEK · Schema da verificare rispetto ai collegamenti reali',10,'start')}</svg>`;
+  const svg=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="Schema unifilare ${safe(board.name||id)}"><rect x="1" y="1" width="${W-2}" height="${H-2}" fill="white" stroke="#263442"/>${s}${text(28,H-13,schemaIsReviewed()?'VIMER TEK · Schema controllato dal responsabile tecnico':'VIMER TEK · Verificare corrispondenza con i collegamenti reali',10,'start')}</svg>`;
   return {board,svg,body:s,height:H};
  }
  const visible=onlyBoard?defs.filter(b=>b.id===onlyBoard):defs;
@@ -426,21 +452,21 @@ function unifilarSVG(onlyBoard=''){
  const height=header+panels.reduce((n,p)=>n+p.height+space,0)+sigH+20;
  let y=header,inner=`<rect x="1" y="1" width="${W-2}" height="${height-2}" fill="white" stroke="#263442"/>`;
  inner+=text(27,29,'SCHEMA UNIFILARE · '+(state.practiceNo||''),17,'start',true);
- inner+=text(27,52,'Rappresentazione gerarchica preliminare — verificare alimentazioni, protezioni e selettività',11,'start');
+ inner+=text(27,52,schemaIsReviewed()?'Rappresentazione gerarchica dei quadri e circuiti':'Rappresentazione gerarchica – verificare alimentazioni e protezioni',11,'start');
  for(const p of panels){inner+=`<svg x="0" y="${y}" width="${W}" height="${p.height}" viewBox="0 0 ${W} ${p.height}">${p.body}</svg>`;y+=p.height+space;}
  if(sigH)inner+=signature()(y+10);
- inner+=text(27,height-13,'VIMER TEK · Elaborato da validare prima dell’utilizzo professionale',10,'start');
- return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${height}" width="${W}" height="${height}" role="img" aria-label="Schema unifilare preliminare">${inner}</svg>`;
+ inner+=text(27,height-13,schemaIsReviewed()?'VIMER TEK · Schema controllato dal responsabile tecnico':'VIMER TEK · Schema da verificare e validare prima del rilascio',10,'start');
+ return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${height}" width="${W}" height="${height}" role="img" aria-label="Schema unifilare">${inner}</svg>`;
 }
 function unifilarPrintPages(){
- if(!vtSchemaHierarchicSupported())return `<section class="print-section"><h2>Schema unifilare · ${esc(state.practiceNo||'')}</h2><p class="notice">Configurazione avanzata: schema preliminare da validare.</p><div class="vt-unifilar-sheet-svg">${unifilarSVGLegacy().replace(/width="\d+" height="\d+" role=/,'width="100%" height="auto" role=')}</div></section>`;
+ if(!vtSchemaHierarchicSupported())return `<section class="print-section"><h2>Schema unifilare · ${esc(state.practiceNo||'')}</h2>${schemaIsReviewed()?'':'<p class="notice">Schema da verificare prima del rilascio.</p>'}<div class="vt-unifilar-sheet-svg">${unifilarSVGLegacy().replace(/width="\d+" height="\d+" role=/,'width="100%" height="auto" role=')}</div></section>`;
  const defs=[{id:'QG',name:'Quadro generale'},...schemaBoards()];
- return defs.map((b,i)=>`<section class="print-section vt-unifilar-sheet"><h2>Schema unifilare · ${esc(state.practiceNo||'')} — ${esc(b.name||b.id)}</h2><p class="notice">Elaborato preliminare: verificare protezioni, collegamenti, selettività e dati prima dell’uso professionale.</p><div class="vt-unifilar-sheet-svg">${unifilarSVG(b.id).replace(/width="\d+" height="\d+" role=/,'width="100%" height="auto" role=')}</div></section>`).join('');
+ return defs.map((b,i)=>`<section class="print-section vt-unifilar-sheet"><h2>Schema unifilare · ${esc(state.practiceNo||'')} — ${esc(b.name||b.id)}</h2>${schemaIsReviewed()?'':'<p class="notice">Schema da verificare: controllare protezioni, collegamenti, selettività e dati prima dell’uso professionale.</p>'}<div class="vt-unifilar-sheet-svg">${unifilarSVG(b.id).replace(/width="\d+" height="\d+" role=/,'width="100%" height="auto" role=')}</div></section>`).join('');
 }
 function refreshSchema(){let d=document.getElementById('schemaPreview');if(d)d.innerHTML=unifilarSVG()}
 function unifilar(){
  let a=schemaItems(),g=schemaGeneral(),groups=schemaGroups(),boards=schemaBoards(),boardOptions=[['QG','Quadro generale'],...boards.map(b=>[b.id,b.name||b.id])],groupOptions=[['','Nessun gruppo'],...groups.map(x=>[x.id,x.name||x.id])];
- return `<div class="card"><h2>Editor schema unifilare · gruppi e quadri</h2><p class="muted">Gestione di partenze, differenziali di gruppo e quadri secondari. La stampa resta un elaborato preliminare da verificare tecnicamente.</p><div class="actions"><button onclick="schemaAdd()">+ Partenza</button><button onclick="schemaAddGroup()">+ Differenziale di gruppo</button><button onclick="schemaAddBoard()">+ Quadro secondario</button><button class="secondary" onclick="schemaRegenerate()">Rigenera dai circuiti</button><button class="secondary" onclick="save(true)">Salva schema</button></div><div class="grid"><label>Protezione generale QG<input value="${escAttr(g.prot)}" onchange='schemaEditGeneral("prot",this.value)'></label></div>
+ return `<div class="card"><h2>Editor schema unifilare · gruppi e quadri</h2><p class="muted">Gestione di partenze, differenziali di gruppo e quadri secondari. Dopo il controllo tecnico dello schema puoi confermarne la revisione per togliere gli avvisi dalla stampa.</p><div class="actions"><button onclick="schemaAdd()">+ Partenza</button><button onclick="schemaAddGroup()">+ Differenziale di gruppo</button><button onclick="schemaAddBoard()">+ Quadro secondario</button><button class="secondary" onclick="schemaRegenerate()">Rigenera dai circuiti</button><button class="secondary" onclick="save(true)">Salva schema</button></div><div class="grid"><label>Protezione generale QG<input value="${escAttr(g.prot)}" onchange='schemaEditGeneral("prot",this.value)'></label><label>Revisione dello schema<select onchange='schemaMarkReviewed(this.value)'><option value='' ${!schemaIsReviewed()?'selected':''}>Da verificare</option><option value='Si' ${schemaIsReviewed()?'selected':''}>Verificato dal responsabile tecnico</option></select></label></div><p class="muted">Seleziona «Verificato» solo dopo il controllo dei collegamenti reali, delle protezioni e delle sezioni. Le modifiche allo schema annullano automaticamente la conferma. ${schemaIsReviewed()?'Revisione registrata il '+esc(state.schemaValidatedOn||'data non indicata')+'.':''}</p>
  <h3>Differenziali di gruppo</h3>${groups.length?'':'<p class="muted">Nessun gruppo inserito.</p>'}${groups.map((x,i)=>`<div class="schema-edit-row"><div class="grid"><label>Codice gruppo<input value="${escAttr(x.id)}" disabled></label><label>Nome<input value="${escAttr(x.name)}" onchange='schemaEditGroup(${i},"name",this.value)'></label><label>Protezione (es. ID 40 A 30 mA tipo A)<input value="${escAttr(x.prot)}" onchange='schemaEditGroup(${i},"prot",this.value)'></label><label>Quadro${schemaSelect(x.board||'QG',boardOptions,`schemaEditGroup(${i},"board",this.value)`)}</label></div><button class="danger" onclick="schemaRemoveGroup(${i})">Rimuovi gruppo</button></div>`).join('')}
  <h3>Quadri secondari</h3>${boards.length?'':'<p class="muted">Nessun quadro secondario inserito.</p>'}${boards.map((x,i)=>`<div class="schema-edit-row"><div class="grid"><label>Codice<input value="${escAttr(x.id)}" disabled></label><label>Nome quadro<input value="${escAttr(x.name)}" onchange='schemaEditBoard(${i},"name",this.value)'></label><label>Protezione linea di alimentazione<input value="${escAttr(x.feed)}" onchange='schemaEditBoard(${i},"feed",this.value)'></label><label>Cavo alimentazione<input value="${escAttr(x.cable)}" onchange='schemaEditBoard(${i},"cable",this.value)'></label></div><button class="danger" onclick="schemaRemoveBoard(${i})">Rimuovi quadro</button></div>`).join('')}
  <h3>Partenze</h3>${a.map((c,i)=>`<div class="schema-edit-row"><b>Partenza ${i+1}</b><div class="grid">${[['name','Circuito'],['prot','Protezione'],['cable','Cavo'],['dest','Destinazione']].map(([k,t])=>`<label>${t}<input value="${escAttr(c[k]||'')}" onchange='schemaEdit(${i},"${k}",this.value)'></label>`).join('')}<label>Tipo dispositivo${schemaDeviceSelect(i,c.device||'MT')}</label><label>Quadro${schemaSelect(c.board||'QG',boardOptions,`schemaEdit(${i},"board",this.value)`)}</label><label>Gruppo differenziale${schemaSelect(c.group||'',groupOptions,`schemaEdit(${i},"group",this.value)`)}</label></div><div class="actions"><button class="secondary" onclick="schemaMove(${i},-1)" ${i===0?'disabled':''}>↑</button><button class="secondary" onclick="schemaMove(${i},1)" ${i===a.length-1?'disabled':''}>↓</button><button class="danger" onclick="schemaRemove(${i})">Rimuovi</button></div></div>`).join('')}<h3>Anteprima</h3><div id="schemaPreview" class="unifilar" style="overflow:auto;background:white">${unifilarSVG()}</div><p class="muted">Questa versione rappresenta i gruppi sopra i circuiti assegnati, senza validare i collegamenti reali. Verificare protezioni, selettività e dati prima dell'uso professionale.</p></div>`;
@@ -670,7 +696,7 @@ w.document.open();w.document.write(html);w.document.close();w.focus();await Prom
 function goStep(step){if(!archiveView)save(false);archiveView=false;active=Math.max(0,Math.min(tabs.length-1,step));render();window.scrollTo(0,0)}
 function stepActions(){if(active===0)return '';return `<div class='card step-actions'><div class='step-title'>Passaggio ${active} di ${tabs.length-1} · ${esc(tabs[active])}</div><div class='actions'>${active>1?`<button type='button' class='secondary' onclick='goStep(${active-1})'>← Indietro · ${esc(tabs[active-1])}</button>`:`<button type='button' class='secondary' onclick='goStep(0)'>← Dashboard</button>`}${active<tabs.length-1?`<button type='button' onclick='goStep(${active+1})'>Salva e continua → ${esc(tabs[active+1])}</button>`:`<button type='button' onclick='save(true)'>Salva pratica</button>`}</div></div>`}
 function render(){nav();document.querySelector('#app').innerHTML=archiveView?`<div class='card'><h2>Archivio pratiche</h2><p>Visualizza tutte le pratiche salvate, apri o elimina una pratica.</p><button class='secondary' onclick='closeArchive()'>← Torna alla dashboard</button></div>${archiveHtml(archive())||`<div class='card'>Nessuna pratica archiviata.</div>`}`:[dashboard,pratica,impianto,materials,circuits,level,checks,projectSection,attachments,unifilar,fascicolo][active]()+stepActions()+`<dialog id='helpDialog' class='help-dialog'><h3>Informazioni sul campo</h3><p id='helpText'></p><form method='dialog'><button>Chiudi</button></form></dialog>`;bind();document.querySelectorAll('[data-help]').forEach(b=>b.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();document.querySelector('#helpText').textContent=b.dataset.help;document.querySelector('#helpDialog').showModal()}))}
-function bind(){document.querySelectorAll('[data-k]').forEach(e=>{let ev=e.tagName==='TEXTAREA'?'input':'change';e.addEventListener(ev,()=>{state[e.dataset.k]=e.value;save(false);if(active===1&&(e.dataset.k==='doc'||e.dataset.k.startsWith('diri')))render();if(e.dataset.k==='doc')render()})});document.querySelectorAll('[data-v-global]').forEach(e=>e.addEventListener('change',()=>{let v=verifyStore();v[e.dataset.vGlobal]=e.value;save(false);if(e.dataset.vGlobal==='mode')render()}));document.querySelectorAll('[data-v-item]').forEach(e=>e.addEventListener('change',()=>{verifyEntry(e.dataset.vItem)[e.dataset.vField]=e.value;save(false)}))}
+function bind(){document.querySelectorAll('[data-k]').forEach(e=>{let ev=e.tagName==='TEXTAREA'?'input':'change';e.addEventListener(ev,()=>{state[e.dataset.k]=e.value;if(['earth','phase','voltage','power'].includes(e.dataset.k))schemaInvalidate();save(false);if(active===1&&(e.dataset.k==='doc'||e.dataset.k.startsWith('diri')))render();if(e.dataset.k==='doc')render()})});document.querySelectorAll('[data-v-global]').forEach(e=>e.addEventListener('change',()=>{let v=verifyStore();v[e.dataset.vGlobal]=e.value;save(false);if(e.dataset.vGlobal==='mode')render()}));document.querySelectorAll('[data-v-item]').forEach(e=>e.addEventListener('change',()=>{verifyEntry(e.dataset.vItem)[e.dataset.vField]=e.value;save(false)}))}
 function save(msg=true){state.updatedAt=new Date().toISOString();localStorage.setItem('vt_dico',JSON.stringify(state));let a=archive(),i=a.findIndex(p=>p.practiceNo===state.practiceNo);if(i>=0)a[i]=JSON.parse(JSON.stringify(state));else a.push(JSON.parse(JSON.stringify(state)));localStorage.setItem('vt_dico_archive',JSON.stringify(a));if(msg)alert('Pratica salvata e archiviata sul dispositivo.')}
 function newPractice(){if(!confirm('Creare una nuova pratica? La pratica corrente verrà salvata.'))return;save(false);state=emptyState();localStorage.setItem('vt_dico',JSON.stringify(state));archiveView=false;active=1;render()}
 // VT_DELETE_CONFIRM_SIMPLE_V1: conferma sì/no, senza digitare il numero della pratica.
@@ -694,7 +720,7 @@ async function deletePractice(no){
 }
 function openPractice(no){let p=archive().find(x=>x.practiceNo===no);if(!p)return;state=p;localStorage.setItem('vt_dico',JSON.stringify(state));archiveView=false;active=1;render()}
 function addFruit(){if(!ftype.value.trim()||!+fqty.value)return;state.fruits.push({room:froom.value.trim(),brand:state.brand||'Da definire',series:state.series||'Da definire',type:ftype.value.trim(),qty:+fqty.value});save(false);render()} function delFruit(i){state.fruits.splice(i,1);save(false);render()}
-function addCircuit(){if(!cname.value.trim())return;state.circuits.push({name:cname.value,prot:cprot.value,cable:ccable.value,dest:cdest.value});save(false);render()} function delCircuit(i){state.circuits.splice(i,1);save(false);render()}
+function addCircuit(){if(!cname.value.trim())return;state.circuits.push({name:cname.value,prot:cprot.value,cable:ccable.value,dest:cdest.value});schemaInvalidate();save(false);render()} function delCircuit(i){state.circuits.splice(i,1);schemaInvalidate();save(false);render()}
 async function addFiles(){const input=document.getElementById('files');const selected=[...(input?.files||[])];if(!selected.length){alert('Seleziona almeno un PDF o immagine.');return}const meta=attachmentMeta();let added=0;for(const f of selected){if(!(/\.pdf$|\.(png|jpe?g|webp)$/i.test(f.name))){alert('Formato non supportato: '+f.name+'. Usa PDF, JPG, PNG o WebP.');continue}if(meta.some(x=>x.name===f.name)){alert('Già presente: '+f.name+'. Rimuovi prima la versione precedente per sostituirla.');continue}const id=state.practiceNo+'::'+(window.crypto?.randomUUID?.()||Date.now()+'_'+added);try{await attachmentWrite({id,file:f})}catch(err){alert('Errore di archiviazione di '+f.name+': '+err.message);break}meta.push({id,name:f.name,size:f.size,type:f.type||''});state.attachments=state.attachments||[];if(!state.attachments.includes(f.name))state.attachments.push(f.name);added++}if(added){save(false);render();alert(added+' file originali conservati nel browser. Ora potranno essere stampati nel fascicolo.')}}
 function delFile(i){state.attachments.splice(i,1);save(false);render()}
 function esc(s=''){return String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))} function escAttr(s=''){return esc(s).replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
