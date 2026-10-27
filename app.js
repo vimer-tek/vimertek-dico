@@ -1,6 +1,6 @@
 const tabs=['Dashboard','Pratica','Impianto','Frutti e materiali','Quadri e circuiti','Livello CEI','Verifiche','Progettisti e progetti','Allegati','Unifilare','Fascicolo'];
 const YEAR=new Date().getFullYear();
-const emptyState=(no)=>({practiceNo:no||nextNo(),doc:'Di.Co.',status:'In lavorazione',client:'',clientTax:'',clientPhone:'',clientEmail:'',address:'',city:'',province:'',work:'Nuovo impianto',workDescription:'',use:'Residenziale',phase:'Monofase',voltage:'230 V',power:'6',earth:'TT',level:'1',brand:'',series:'',fruits:[],circuits:[],checks:{},verification:{mode:'rapida',items:{},instruments:[],date:'',notes:''},attachments:[],declarationRole:'Impresa installatrice',issuerCompany:'',issuerTechnician:'',issuerBasis:'',designers:[],projects:[],company:'Vimer Tek Srls',technician:'',createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()});
+const emptyState=(no)=>({practiceNo:no||nextNo(),doc:'Di.Co.',status:'In lavorazione',client:'',clientTax:'',clientPhone:'',clientEmail:'',address:'',city:'',province:'',work:'Nuovo impianto',workDescription:'',use:'Residenziale',phase:'Monofase',voltage:'230 V',power:'6',earth:'TT',level:'1',brand:'',series:'',fruits:[],circuits:[],checks:{},verification:{mode:'rapida',items:{},instruments:[],date:'',notes:''},attachments:[],declarationRole:'Impresa installatrice',issuerCompany:'',issuerTechnician:'',issuerBasis:'',designers:[],projects:[],company:'VIMER TEK S.R.L.S.',technician:'',createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()});
 function archive(){try{return JSON.parse(localStorage.getItem('vt_dico_archive')||'[]')}catch{return[]}}
 function nextNo(){let a=archive(), nums=a.map(p=>+(String(p.practiceNo||'').match(/(\d+)$/)||[])[1]||0);let last=+(localStorage.getItem('vt_dico_last_no_'+YEAR)||0);let n=Math.max(0,last,...nums)+1;localStorage.setItem('vt_dico_last_no_'+YEAR,String(n));return `VT-DICO-${YEAR}-${String(n).padStart(3,'0')}`}
 let state;try{state=JSON.parse(localStorage.getItem('vt_dico')||'null')}catch{}; state=state||emptyState(); let active=0; let archiveView=false;
@@ -81,7 +81,7 @@ function diriRiquadro(){
   </div>`;
 }
 
-function pratica(){return `<div class=card><h2>Dati pratica</h2><div class=grid>${field('practiceNo','Numero pratica','Identificativo univoco della pratica.')}<label>Documento ${help('Seleziona Di.Co. o Di.Ri.')}<select data-k=doc>${['Di.Co.','Di.Ri.'].map(x=>`<option ${state.doc===x?'selected':''}>${x}</option>`)}</select></label><label>Stato<select data-k=status>${['In lavorazione','Da verificare','Completata'].map(x=>`<option ${state.status===x?'selected':''}>${x}</option>`)}</select></label>${field('client','Cliente / committente','Intestatario o committente dei lavori.')}${field('clientTax','Codice fiscale / P.IVA','Dato fiscale del cliente o committente.')}${field('clientPhone','Telefono','Recapito telefonico del cliente.','tel')}${field('clientEmail','Email','Email del cliente.','email')}${field('address','Ubicazione impianto','Via/piazza e numero civico.')}${field('city','Comune','Comune dell’impianto.')}${field('province','Provincia','Sigla provincia.')}<label>Intervento<select data-k=work>${['Nuovo impianto','Trasformazione','Ampliamento','Manutenzione straordinaria','Altro'].map(x=>`<option ${state.work===x?'selected':''}>${x}</option>`)}</select></label><label>Destinazione<select data-k=use>${['Residenziale','Commerciale','Artigianale','Industriale','Uffici','Altro'].map(x=>`<option ${state.use===x?'selected':''}>${x}</option>`)}</select></label><label class=wide>Descrizione lavori<textarea data-k=workDescription>${esc(state.workDescription||'')}</textarea></label><label>Ruolo del soggetto dichiarante ${help('Per la dichiarazione come impresa non installatrice verificare la fattispecie giuridica applicabile e il modello ufficiale; la selezione non abilita automaticamente al rilascio.') }<select data-k='${state.doc==='Di.Ri.'?'diriRole':'declarationRole'}'>${(state.doc==='Di.Ri.'?['','Professionista iscritto all’albo','Responsabile tecnico di impresa abilitata']:['Impresa installatrice','Impresa non installatrice — caso da verificare']).map(x=>`<option ${((state.doc==='Di.Ri.'?state.diriRole:state.declarationRole)===x)?'selected':''}>${x||'Seleziona il ruolo'}</option>`).join('')}</select></label>${field('company','Impresa esecutrice','Impresa che ha eseguito i lavori.')}${field('issuerCompany','Soggetto che rilascia la dichiarazione','Indicare la ragione sociale del soggetto dichiarante, se diverso dall’esecutore.')}${field('issuerTechnician','Firmatario della dichiarazione','Nominativo e qualifica del firmatario.')}${field(state.doc==='Di.Ri.'?'diriBasis':'issuerBasis',state.doc==='Di.Ri.'?'Titolo e requisiti professionali per la Di.Ri.':'Titolo / presupposto normativo','Specificare la fattispecie ammessa e la documentazione di supporto; da verificare con professionista competente.')}${field('technician','Responsabile tecnico','Nome e cognome del responsabile tecnico.')}${state.doc==='Di.Co.'?`<div class='wide'><h3>Dati aggiuntivi Di.Co. ministeriale (bozza)</h3><p class='muted'>Campi da verificare con i dati dell'impresa e il modello ufficiale vigente.</p></div>${field('companyAddress','Sede legale impresa','Indirizzo e comune sede legale.')}${field('companyVat','P. IVA impresa','Partita IVA impresa.')}${field('registryOffice','CCIAA / Albo imprese artigiane','Camera di commercio o albo competente.')}${field('registryNumber','Numero iscrizione','Numero iscrizione impresa.')}${field('dicoDate','Data dichiarazione','Data da riportare sul modulo.')}${field('dicoPlace','Luogo dichiarazione','Luogo di sottoscrizione.')}`:`<div class='wide'>
+function pratica(){return `<div class=card><h2>Dati pratica</h2><div class=grid>${field('practiceNo','Numero pratica','Identificativo univoco della pratica.')}<label>Documento ${help('Seleziona Di.Co. o Di.Ri.')}<select data-k=doc>${['Di.Co.','Di.Ri.'].map(x=>`<option ${state.doc===x?'selected':''}>${x}</option>`)}</select></label><label>Stato<select data-k=status>${['In lavorazione','Da verificare','Completata'].map(x=>`<option ${state.status===x?'selected':''}>${x}</option>`)}</select></label>${field('client','Cliente / committente','Intestatario o committente dei lavori.')}${field('clientTax','Codice fiscale / P.IVA','Dato fiscale del cliente o committente.')}${field('clientPhone','Telefono','Recapito telefonico del cliente.','tel')}${field('clientEmail','Email','Email del cliente.','email')}${field('address','Ubicazione impianto','Via/piazza e numero civico.')}${field('city','Comune','Comune dell’impianto.')}${field('province','Provincia','Sigla provincia.')}<label>Intervento<select data-k=work>${['Nuovo impianto','Trasformazione','Ampliamento','Manutenzione straordinaria','Altro'].map(x=>`<option ${state.work===x?'selected':''}>${x}</option>`)}</select></label><label>Destinazione<select data-k=use>${['Residenziale','Commerciale','Artigianale','Industriale','Uffici','Altro'].map(x=>`<option ${state.use===x?'selected':''}>${x}</option>`)}</select></label><label class=wide>Descrizione lavori<textarea data-k=workDescription>${esc(state.workDescription||'')}</textarea></label><label>Ruolo del soggetto dichiarante ${help('Per la dichiarazione come impresa non installatrice verificare la fattispecie giuridica applicabile e il modello ufficiale; la selezione non abilita automaticamente al rilascio.') }<select data-k='${state.doc==='Di.Ri.'?'diriRole':'declarationRole'}'>${(state.doc==='Di.Ri.'?['','Professionista iscritto all’albo','Responsabile tecnico di impresa abilitata']:['Impresa installatrice','Impresa non installatrice — caso da verificare']).map(x=>`<option ${((state.doc==='Di.Ri.'?state.diriRole:state.declarationRole)===x)?'selected':''}>${x||'Seleziona il ruolo'}</option>`).join('')}</select></label>${field('company','Impresa esecutrice','Impresa che ha eseguito i lavori.')}${field('issuerCompany','Soggetto che rilascia la dichiarazione','Indicare la ragione sociale del soggetto dichiarante, se diverso dall’esecutore.')}${field('issuerTechnician','Firmatario della dichiarazione','Nominativo e qualifica del firmatario.')}${field(state.doc==='Di.Ri.'?'diriBasis':'issuerBasis',state.doc==='Di.Ri.'?'Titolo e requisiti professionali per la Di.Ri.':'Titolo / presupposto normativo','Specificare la fattispecie ammessa e la documentazione di supporto; da verificare con professionista competente.')}${field('technician','Responsabile tecnico','Nome e cognome del responsabile tecnico.')}${state.doc==='Di.Co.'?`<div class='wide'><h3>Dati della Di.Co. · Allegato I ministeriale</h3><p class='muted'>Campi da verificare con i dati dell'impresa e il modello ufficiale vigente.</p></div>${field('companyAddress','Sede legale impresa','Indirizzo e comune sede legale.')}${field('companyVat','P. IVA impresa','Partita IVA impresa.')}${field('companyPhone','Telefono impresa','Recapito telefonico sede aziendale.')}${field('companySector','Settore impiantistico','Settore effettivo dell’abilitazione impresa.')}${field('technicalStandard','Norme tecniche applicate','Indicare norme effettivamente utilizzate, dopo verifica tecnica.')}${field('projectAuthor','Redattore del progetto / schema','Indicare il progettista oppure il responsabile tecnico se competente e ammesso.')}${field('registryOffice','CCIAA / Albo imprese artigiane','Camera di commercio o albo competente.')}${field('registryNumber','Numero iscrizione','Numero iscrizione impresa.')}${field('dicoDate','Data dichiarazione','Data da riportare sul modulo.')}${field('dicoPlace','Luogo dichiarazione','Luogo di sottoscrizione.')}<div class='wide'><h3>Controlli prima dell’emissione definitiva</h3><p class='muted'>Selezionare Sì soltanto dopo aver realmente verificato documenti, misure e allegati; il programma non li certifica.</p></div>${[['dicoProjectVerified','Progetto e schema verificati'],['dicoMaterialsVerified','Materiali conformi e relazione completata'],['dicoTestsVerified','Verifiche e misure eseguite con esito positivo'],['dicoCertVerified','Certificato camerale requisiti tecnico-professionali allegato']].map(([key,label])=>`<label>${label}<select data-k='${key}'><option value='' ${!state[key]?'selected':''}>Da verificare</option><option value='Si' ${state[key]==='Si'?'selected':''}>Sì</option><option value='No' ${state[key]==='No'?'selected':''}>No</option></select></label>`).join('')}`:`<div class='wide'>
 <h3>Dati specifici Di.Ri.</h3>
 <p class='muted'>Dichiarazione di rispondenza: verificare applicabilità, requisiti del dichiarante e documentazione tecnica.</p>
 </div>${field('diriYear','Epoca di realizzazione impianto','Indicare il periodo in cui è stato realizzato l’impianto.')}
@@ -446,9 +446,9 @@ function unifilar(){
  <h3>Partenze</h3>${a.map((c,i)=>`<div class="schema-edit-row"><b>Partenza ${i+1}</b><div class="grid">${[['name','Circuito'],['prot','Protezione'],['cable','Cavo'],['dest','Destinazione']].map(([k,t])=>`<label>${t}<input value="${escAttr(c[k]||'')}" onchange='schemaEdit(${i},"${k}",this.value)'></label>`).join('')}<label>Tipo dispositivo${schemaDeviceSelect(i,c.device||'MT')}</label><label>Quadro${schemaSelect(c.board||'QG',boardOptions,`schemaEdit(${i},"board",this.value)`)}</label><label>Gruppo differenziale${schemaSelect(c.group||'',groupOptions,`schemaEdit(${i},"group",this.value)`)}</label></div><div class="actions"><button class="secondary" onclick="schemaMove(${i},-1)" ${i===0?'disabled':''}>↑</button><button class="secondary" onclick="schemaMove(${i},1)" ${i===a.length-1?'disabled':''}>↓</button><button class="danger" onclick="schemaRemove(${i})">Rimuovi</button></div></div>`).join('')}<h3>Anteprima</h3><div id="schemaPreview" class="unifilar" style="overflow:auto;background:white">${unifilarSVG()}</div><p class="muted">Questa versione rappresenta i gruppi sopra i circuiti assegnati, senza validare i collegamenti reali. Verificare protezioni, selettività e dati prima dell'uso professionale.</p></div>`;
 }
 
-const PRINT_SECTIONS=[['cover','Copertina e indice (pagina 2)'],['declaration','Dichiarazione / scheda dati'],['ministerial','Di.Co. · modello ministeriale (bozza)'],['materials','Relazione materiali'],['circuits','Quadri e circuiti'],['unifilar','Schema unifilare'],['verification','Rapporto verifiche'],['projects','Progettisti e progetti'],['attachments','Allegati originali (file PDF e immagini)']];
+const PRINT_SECTIONS=[['cover','Copertina e indice (pagina 2)'],['declaration','Dichiarazione / scheda dati'],['ministerial','Di.Co. · Allegato I D.M. 37/2008'],['materials','Relazione materiali'],['circuits','Quadri e circuiti'],['unifilar','Schema unifilare'],['verification','Rapporto verifiche'],['projects','Progettisti e progetti'],['attachments','Allegati originali (file PDF e immagini)']];
 function availablePrintSections(){return PRINT_SECTIONS.filter(([id])=>id!=='ministerial'||state.doc==='Di.Co.').filter(([id])=>id!=='projects'||hasProjectData()).filter(([id])=>id!=='attachments'||attachmentMeta().length>0)}
-function fascicolo(){return `<div class='card'><h2>Stampa fascicolo tecnico</h2><p class='muted'>Stampa A4 del fascicolo o dei singoli documenti. Le sezioni vuote non vengono stampate. Gli allegati originali (PDF e immagini) sono aggiunti come pagine, non come elenco di nomi.</p><div class='actions'><button type='button' onclick='printFascicolo()'>Stampa fascicolo completo</button><button type='button' class='secondary' onclick='printSelected()'>Stampa documenti selezionati</button></div><h3>Documenti da stampare</h3><div class='print-options'>${availablePrintSections().map(([id,title])=>`<label class='print-option'><input type='checkbox' data-print-section='${id}' ${id==='cover'?'':'checked'}> ${esc(title)}</label>`).join('')}</div>${!attachmentMeta().length?'<p class=muted>Non ci sono allegati originali da stampare: carica PDF o immagini nella sezione Allegati. I vecchi nomi da soli non bastano.</p>':''}<p class='muted'>La dichiarazione ministeriale resta una bozza operativa da verificare. La copertina definitiva non è stata modificata.</p></div><div class='card'><h3>Anteprima copertina</h3><div class='cover'><img src='assets/logo-vimertek.png' alt='Vimer Tek'><h2>FASCICOLO TECNICO IMPIANTO ELETTRICO</h2><h3>${esc(state.doc)}</h3><div>${esc(state.practiceNo)}</div><div class='box'><b>Cliente:</b> ${esc(state.client||'Da compilare')}<br><b>Ubicazione:</b> ${esc([state.address,state.city,state.province].filter(Boolean).join(', ')||'Da compilare')}<br><b>Intervento:</b> ${esc(state.work)}<br><b>Impresa:</b> ${esc(state.company||'Da compilare')}<br><b>Responsabile tecnico:</b> ${esc(state.technician||'Da compilare')}</div></div></div>`}
+function fascicolo(){return `<div class='card'><h2>Stampa fascicolo tecnico · v1.9.11</h2><p class='muted'>Stampa A4 del fascicolo o dei singoli documenti. Le sezioni vuote non vengono stampate. Gli allegati originali (PDF e immagini) sono aggiunti come pagine, non come elenco di nomi.</p><div class='actions'><button type='button' onclick='printFascicolo()'>Stampa fascicolo completo</button><button type='button' class='secondary' onclick='printSelected()'>Stampa documenti selezionati</button></div><h3>Documenti da stampare</h3><div class='print-options'>${availablePrintSections().map(([id,title])=>`<label class='print-option'><input type='checkbox' data-print-section='${id}' ${id==='cover'?'':'checked'}> ${esc(title)}</label>`).join('')}</div>${!attachmentMeta().length?'<p class=muted>Non ci sono allegati originali da stampare: carica PDF o immagini nella sezione Allegati. I vecchi nomi da soli non bastano.</p>':''}<p class='muted'>Il modello Allegato I si stampa soltanto quando i dati e le verifiche richiesti sono stati confermati. Restano necessarie le firme e la documentazione tecnica effettiva. La copertina non è stata modificata.</p></div><div class='card'><h3>Anteprima copertina</h3><div class='cover'><img src='assets/logo-vimertek.png' alt='Vimer Tek'><h2>FASCICOLO TECNICO IMPIANTO ELETTRICO</h2><h3>${esc(state.doc)}</h3><div>${esc(state.practiceNo)}</div><div class='box'><b>Cliente:</b> ${esc(state.client||'Da compilare')}<br><b>Ubicazione:</b> ${esc([state.address,state.city,state.province].filter(Boolean).join(', ')||'Da compilare')}<br><b>Intervento:</b> ${esc(state.work)}<br><b>Impresa:</b> ${esc(state.company||'Da compilare')}<br><b>Responsabile tecnico:</b> ${esc(state.technician||'Da compilare')}</div></div></div>`}
 function printFascicolo(){printDocuments(availablePrintSections().map(x=>x[0]))}
 function printSelected(){const ids=[...document.querySelectorAll('[data-print-section]:checked')].map(x=>x.dataset.printSection);if(!ids.length){alert('Seleziona almeno un documento.');return}printDocuments(ids)}
 function isNotApplicable(value){return typeof value==='string' && /^non applicabile$/i.test(value.trim())}
@@ -473,7 +473,7 @@ ${entry('Esito delle verifiche',state.diriOutcome)}
 ${entry('Data dichiarazione',state.diriDate)}
 ${entry('Luogo dichiarazione',state.diriPlace)}
 <p class='notice'>Verificare applicabilità della Di.Ri., requisiti del dichiarante e documentazione delle verifiche prima della sottoscrizione.</p>
-`:''}<div class='print-signature'><span>Firma del responsabile tecnico${esc(state.technician||'')}<i></i></span></div></section>`;
+`:''}<div class='print-signature'><span>Firma del responsabile tecnico<br>${esc(state.technician||'')}<i></i></span></div></section>`;
 if(id==='materials')return `<section class='print-section'><h2>Relazione materiali e punti impianto</h2>${entry('Marca / serie prevalente',[state.brand,state.series].filter(Boolean).join(' / '))}${printableTable(['Locale','Marca','Serie','Tipologia','Quantità'],(state.fruits||[]).map(x=>[x.room,x.brand,x.series,x.type,x.qty]))}<p><strong>Totale frutti registrati:</strong> ${(state.fruits||[]).reduce((a,x)=>a+(Number(x.qty)||0),0)}</p></section>`;
 if(id==='circuits')return `<section class='print-section'><h2>Quadri e circuiti</h2>${entry('Distribuzione',state.earth)}${entry('Fasi',state.phase)}${entry('Tensione',state.voltage)}${printableTable(['Circuito','Protezione','Cavo','Destinazione'],(state.circuits||[]).map(x=>[x.name,x.prot,x.cable,x.dest]))}</section>`;
 if(id==='unifilar')return unifilarPrintPages();
@@ -483,70 +483,102 @@ if(id==='verification')return `<section class='print-section'><h2>Rapporto verif
 if(id==='projects'){projectStore();if(!hasProjectData())return '';return `<section class='print-section'><h2>Progettisti e progetti</h2>${printableTable(['Progettista','Ordine / Collegio','Iscrizione','Contatto'],state.designers.map(x=>[x.name,x.order,x.number,x.contact]))}${printableTable(['Progetto','Progettista','Revisione','Data','File registrati'],state.projects.map(x=>[x.title,x.designer,x.revision,x.date,(x.files||[]).join(', ')]))}<p class='notice'>I file sono elencati per nome e devono essere allegati separatamente. Verificare gli elaborati e le firme professionali richieste.</p></section>`}
 if(id==='attachments')return '';return ''}
 // VT_DICO_IMPRESA_INSTALLATRICE_V1910C
-function ministerialDico(){
-const m=state.vtV1910?.ministerial||{};
- const e=x=>esc(x||'________________________'),loc=[state.address,state.city,state.province].filter(Boolean).join(', '),firm=m.representative||state.issuerTechnician||state.technician;
- return `<section class='print-section ministerial-dico'><div style='text-align:right;font-size:9pt'>D.M. 37/2008 · Allegato I · BOZZA DA COMPLETARE E VERIFICARE</div><h2>DICHIARAZIONE DI CONFORMITÀ DELL’IMPIANTO ALLA REGOLA DELL’ARTE</h2><p>Il sottoscritto <strong>${e(firm)}</strong>, in qualità di titolare o legale rappresentante dell’impresa <strong>${e(state.company)}</strong>, con sede in <strong>${e((m.headOffice||state.companyAddress)||"__________________________")}</strong>, P. IVA <strong>${e(state.companyVat||"__________________________")}</strong>, iscritta al Registro delle Imprese / Albo imprese artigiane di <strong>${e((m.regOffice||state.registryOffice)||"__________________________")}</strong>, n. <strong>${e((m.regNo||state.registryNumber)||"__________________________")}</strong>, esecutrice dell’impianto sotto descritto,</p><p><b>COMMITTENTE:</b> ${e(state.client)} · CF/P.IVA: ${e(state.clientTax)}</p><p><b>IMMOBILE:</b> ${e(loc)} · Destinazione d’uso: ${e(state.use)}</p><p><b>INTERVENTO:</b> ${e(state.work)} · ${e(state.workDescription)}</p><p><b>TIPOLOGIA:</b> impianto elettrico · ${e(state.phase)} · ${e(state.voltage)} · sistema ${e(state.earth)}</p>
-
-${m.sector?`<p><b>Settore di attività:</b> ${e(m.sector)}</p>`:''}
-${m.owner?`<p><b>Proprietario:</b> ${e(m.owner)}</p>`:''}
-${m.projectAuthor?`<p><b>Progettista:</b> ${e(m.projectAuthor)}</p>`:''}
-${m.technicalStandard?`<p><b>Norme tecniche applicate:</b> ${e(m.technicalStandard)}</p>`:''}
-<h3>DICHIARA</h3>
-<p>Sotto la propria responsabilità, che l'impianto è stato
-realizzato secondo la regola dell'arte, ai sensi dell'art. 6
-del D.M. 37/2008, considerate le condizioni di esercizio
-e la destinazione dell'edificio.</p>
-
-<p>In particolare, dichiara di avere:</p>
-<ul style="margin:3px 0 6px 18px;padding:0">
-<li>rispettato il progetto, nei casi previsti dall'art. 5;</li>
-<li>seguito le norme tecniche applicabili all'impianto;</li>
-<li>installato componenti e materiali idonei al luogo;</li>
-<li>effettuato con esito positivo i controlli di sicurezza
-e funzionalità richiesti dalle disposizioni applicabili.</li>
-</ul>
-
-<h3>Allegati obbligatori da verificare e unire</h3>
-<p>□ Progetto ai sensi degli artt. 5 e 7;<br>
-□ Relazione sulle tipologie dei materiali utilizzati;<br>
-□ Schema dell'impianto realizzato;<br>
-□ Riferimenti a dichiarazioni precedenti o parziali;<br>
-□ Certificato dei requisiti tecnico-professionali.</p>
-
-<p><b>Allegati facoltativi:</b>
-${e((state.attachments||[]).join('; '))}</p>
-
-<h3>DECLINA</h3>
-<p>Ogni responsabilità per sinistri a persone o cose
-derivanti da manomissioni dell'impianto da parte di terzi
-o da carenze di manutenzione o riparazione.</p>
-
-<p><b>Data:</b> ${e(state.dicoDate)}
-&nbsp;&nbsp; <b>Luogo:</b> ${e(state.dicoPlace)}</p>
-
-<div style="display:flex;gap:10mm;justify-content:space-between">
-<div style="width:48%;text-align:center">
-<b>Il responsabile tecnico</b>
-<p>${e(state.technician)}</p>
-<div style="height:13mm"></div>
-</div>
-<div style="width:48%;text-align:center">
-<b>Il dichiarante</b>
-<p>${e(firm)}</p>
-<div style="height:13mm"></div>
-</div>
-</div>
-
-<p style="font-size:8pt">
-<b>Avvertenze per il committente:</b>
-obblighi del committente e del proprietario secondo
-l'art. 8 del D.M. 37/2008.
-</p>
-<p class='notice' style='font-size:8pt'>BOZZA OPERATIVA: non è una riproduzione certificata del modulo ministeriale. Prima dell’emissione verificare testo, dichiarazioni, dati identificativi, eventuali esclusioni, firme e allegati con il modello vigente. Questa sezione è predisposta per le Di.Co. di imprese installatrici; non utilizzare come Di.Ri.</p></section>`
+// VIMERTEK_DICO_FINALE_1911_20261027: rilascio documento solo a dati completi.
+function vtDicoDatiMancanti(){
+  const m=state.vtV1910?.ministerial||{};
+  const blanks=[];
+  const req=(label,value)=>{if(!String(value??'').trim())blanks.push(label)};
+  if(state.doc!=='Di.Co.' || state.declarationRole!=='Impresa installatrice')
+    blanks.push('Di.Co. rilasciata da impresa installatrice');
+  const co=String(state.company||'').trim();
+  if(!/vimer\s*tek/i.test(co))blanks.push('Ragione sociale Vimer Tek');
+  req('Firmatario / legale rappresentante',m.representative||state.issuerTechnician||state.technician);
+  req('Responsabile tecnico',state.technician);
+  req('Committente',state.client);
+  req('CF / P.IVA committente',state.clientTax);
+  req('Ubicazione',state.address);
+  if(!String(state.city||'').trim()||!String(state.province||'').trim())blanks.push('Comune e provincia dell’immobile');
+  req('Descrizione lavori',state.workDescription);
+  req('Sede impresa',state.companyAddress||m.headOffice);
+  req('Telefono impresa',state.companyPhone);
+  if(String(state.companyVat||'01760570885').replace(/\D/g,'')!=='01760570885')blanks.push('Partita IVA Vimer Tek');
+  req('Settore impiantistico',state.companySector||m.sector);
+  req('CCIAA / Albo',state.registryOffice||m.regOffice);
+  if(/^\s*\d+\s*$/.test(state.registryOffice||m.regOffice||''))blanks.push('CCIAA: indicare il nome, non il solo numero');
+  req('Numero iscrizione Registro imprese / Albo',state.registryNumber||m.regNo);
+  req('Norma tecnica applicata',state.technicalStandard||m.technicalStandard);
+  req('Progettista o redattore elaborato',state.projectAuthor||m.projectAuthor||(state.designers||[])[0]?.name);
+  req('Data e luogo di rilascio',state.dicoDate&&state.dicoPlace);
+  if(!(state.fruits||[]).some(x=>Number(x.qty)>0))blanks.push('Relazione materiali / punti impianto compilata');
+  if(!(state.circuits||[]).length&&!Array.isArray(state.schemaItems))blanks.push('Circuiti e schema impianto');
+  const v=verifyStore();
+  if(!String(v.date||'').trim())blanks.push('Data verifiche');
+  if(!String(v.instrumentNotes||'').trim())blanks.push('Strumento utilizzato e identificazione');
+  const actual=Object.values(v.items||{});
+  if(!actual.some(x=>x&&x.result==='Conforme'))blanks.push('Esiti delle verifiche realmente eseguite');
+  const remaining=verifyItems().filter(([id])=>!['Conforme','Non applicabile'].includes(verifyEntry(id).result));
+  if(remaining.length)blanks.push('Completare gli esiti delle verifiche: '+remaining.length+' non compilate');
+  if(actual.some(x=>x && x.result==='Non conforme'))blanks.push('Risoluzione esiti non conformi');
+  for(const [k,t] of [['dicoProjectVerified','Progetto e schema verificati'],['dicoMaterialsVerified','Relazione materiali verificata'],['dicoTestsVerified','Verifiche strumentali concluse'],['dicoCertVerified','Certificato requisiti tecnico-professionali allegato']]) {
+    if(state[k]!=='Si')blanks.push(t);
+  }
+  return [...new Set(blanks)];
 }
+function ministerialDico(){
+ const m=state.vtV1910?.ministerial||{};
+ const e=x=>esc(String(x??'').trim()||'________________');
+ const firm=m.representative||state.issuerTechnician||state.technician||'DECARO ALESSIO';
+ const company=/vimer\s*tek/i.test(state.company||'')?'VIMER TEK S.R.L.S.':(state.company||'');
+ const loc=[state.address,state.city,state.province].filter(Boolean).join(', ');
+ const sector=state.companySector||m.sector;
+ const standard=state.technicalStandard||m.technicalStandard;
+ const progettista=state.projectAuthor||m.projectAuthor||(state.designers||[])[0]?.name||state.technician;
+ const iscrizione=state.registryNumber||m.regNo;
+ const camera=state.registryOffice||m.regOffice;
+ const note=Array.isArray(state.attachments)?state.attachments.join('; '):'';
+ return `<section class='print-section ministerial-dico vt-allegato-1'>
+ <div class='vt-dico-law'>D.M. 37/2008 · Allegato I (modello aggiornato dal D.M. 19 maggio 2010)</div>
+ <h2>DICHIARAZIONE DI CONFORMITÀ DELL’IMPIANTO ALLA REGOLA DELL’ARTE</h2>
+ <p>Il sottoscritto <b>${e(firm)}</b>, titolare o legale rappresentante dell’impresa <b>${e(company)}</b>,
+ operante nel settore <b>${e(sector)}</b>, con sede in <b>${e(state.companyAddress||m.headOffice)}</b>,
+ tel. <b>${e(state.companyPhone)}</b>, P. IVA <b>${e(state.companyVat||'01760570885')}</b>,
+ iscritta nel Registro delle Imprese / Albo delle imprese artigiane della C.C.I.A.A. di <b>${e(camera)}</b>,
+ n. <b>${e(iscrizione)}</b>, esecutrice dell’impianto di seguito descritto:</p>
+ <p><b>Impianto:</b> ${e(state.workDescription)}<br>
+ <b>Committente:</b> ${e(state.client)} · CF/P.IVA ${e(state.clientTax)}<br>
+ <b>Edificio / unità immobiliare:</b> ${e(loc)}<br>
+ <b>Destinazione d’uso:</b> ${e(state.use)} · <b>Tipo intervento:</b> ${e(state.work)}<br>
+ <b>Impianto elettrico:</b> ${e(state.phase)} ${e(state.voltage)}, sistema ${e(state.earth)}</p>
+ <h3>DICHIARA</h3>
+ <p>Sotto la propria personale responsabilità, che l’impianto è stato realizzato in modo conforme alla regola dell’arte secondo quanto previsto dall’art. 6 del D.M. 37/2008, tenuto conto delle condizioni di esercizio e degli usi cui è destinato l’edificio, avendo in particolare:</p>
+ <ul class='vt-dico-declarations'>
+ <li>rispettato il progetto, redatto ai sensi dell’art. 5 da <b>${e(progettista)}</b>;</li>
+ <li>seguito la norma tecnica applicabile all’impiego: <b>${e(standard)}</b>;</li>
+ <li>installato componenti e materiali adatti al luogo di installazione;</li>
+ <li>controllato l’impianto ai fini della sicurezza e della funzionalità, con esito positivo, eseguendo le verifiche richieste dalle norme e dalla legge.</li>
+ </ul>
+ <h3>ALLEGATI OBBLIGATORI</h3>
+ <p>□ Progetto ai sensi degli artt. 5 e 7 (e relative varianti ove previste);<br>
+ □ Relazione con tipologie dei materiali utilizzati;<br>
+ □ Schema dell’impianto realizzato;<br>
+ □ Riferimento a dichiarazioni di conformità precedenti o parziali, già esistenti, ove pertinenti;<br>
+ □ Copia del certificato di riconoscimento dei requisiti tecnico-professionali.</p>
+ <p><b>Allegati facoltativi:</b> ${e(note||'Nessuno')}</p>
+ <h3>DECLINA</h3>
+ <p>Ogni responsabilità per sinistri a persone o cose derivanti da manomissioni dell’impianto da parte di terzi ovvero da carenze di manutenzione o riparazione.</p>
+ <p><b>Data:</b> ${e(state.dicoDate)} &nbsp; <b>Luogo:</b> ${e(state.dicoPlace)}</p>
+ <div class='vt-dico-signatures'>
+ <div><b>IL RESPONSABILE TECNICO</b><p>${e(state.technician)}</p><span>Timbro e firma</span></div>
+ <div><b>IL DICHIARANTE</b><p>${e(firm)}</p><span>Timbro e firma</span></div>
+ </div>
+ <p class='vt-dico-warnings'><b>Avvertenze per il committente:</b> responsabilità del committente e del proprietario secondo l’art. 8 del D.M. 37/2008.</p>
+ </section>`;
+}
+
 let printIds=[];
-async function printDocuments(ids){save(false);printIds=ids.filter(id=>id!=='ministerial'||state.doc==='Di.Co.').filter(id=>id!=='projects'||hasProjectData()).filter(id=>id!=='attachments'||attachmentMeta().length>0);const missing=[['Cliente',state.client],['Ubicazione',state.address],['Responsabile tecnico',state.technician]].filter(([,x])=>!String(x||'').trim()).map(([x])=>x);if(missing.length&&!confirm('Attenzione: dati mancanti ('+missing.join(', ')+'). Vuoi generare comunque una BOZZA di stampa?'))return;
+async function printDocuments(ids){
+ if(state.doc==='Di.Co.' && ids.includes('ministerial')){const mancanti=vtDicoDatiMancanti();if(mancanti.length){alert('DICHIARAZIONE NON EMETTIBILE. Prima di stampare il modello Di.Co. completare e verificare:\n\n• '+mancanti.join('\n• '));return;}}
+save(false);printIds=ids.filter(id=>id!=='ministerial'||state.doc==='Di.Co.').filter(id=>id!=='projects'||hasProjectData()).filter(id=>id!=='attachments'||attachmentMeta().length>0);const missing=[['Cliente',state.client],['Ubicazione',state.address],['Responsabile tecnico',state.technician]].filter(([,x])=>!String(x||'').trim()).map(([x])=>x);if(missing.length&&!confirm('Attenzione: dati mancanti ('+missing.join(', ')+'). Vuoi generare comunque una BOZZA di stampa?'))return;
 const w=window.open('','_blank');if(!w){alert('Il browser ha bloccato la finestra di stampa. Consenti i popup.');return}w.document.open();w.document.write('<!doctype html><html><head><meta charset="utf-8"></head><body style="font:16px Arial;padding:30px">Preparazione dei documenti originali per la stampa...</body></html>');w.document.close();
 let realAttachmentHTML='';try{if(printIds.includes('attachments'))realAttachmentHTML=await buildRealAttachmentPages()}catch(err){w.document.body.textContent='Impossibile preparare gli allegati: '+err.message;alert('Stampa annullata: '+err.message);return}
 const html=`<!doctype html><html lang='it'><head><meta charset='utf-8'><title>${esc(state.practiceNo)} - Documenti</title><base href='${escAttr(document.baseURI)}'><style>@page{size:A4;margin:17mm 15mm 20mm}*{box-sizing:border-box}body{font:10.5pt Arial,sans-serif;color:#17202a;margin:0;line-height:1.4}h1{font-size:19pt}h2{font-size:15pt;margin:15mm 0 5mm}h3{font-size:12pt;margin:8mm 0 3mm}p{margin:3mm 0;overflow-wrap:anywhere}table{width:100%;border-collapse:collapse;font-size:9pt;table-layout:fixed;margin:5mm 0}th,td{border:1px solid #8e969e;padding:2.5mm;overflow-wrap:anywhere;vertical-align:top}th{background:#eee}tr{break-inside:avoid}h2,h3{break-after:avoid}.print-page{break-after:page}.print-section{break-before:page}.print-page+.print-section{break-before:page}.cover-page{text-align:center;min-height:235mm}.big-logo{width:70mm;height:40mm;object-fit:contain;margin:12mm auto 4mm}.cover-data{text-align:left;border:1px solid #ccc;padding:7mm;margin:12mm auto;max-width:160mm}.cover-page ol{text-align:left;max-width:150mm;margin:auto}.notice{background:#f6f6f6;border-left:3px solid #666;padding:3mm}.diagram-source{border:2px solid #222;padding:4mm;text-align:center;font-weight:bold;max-width:135mm;margin:8mm auto}.diagram-row{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border:1px solid #777;margin:4mm 0;padding:3mm;gap:3mm;break-inside:avoid;font-size:9pt}.diagram-lines{border-left:3px solid #222;margin-left:12mm;padding-left:9mm}.doc-footer{position:fixed;bottom:-13mm;left:0;right:0;border-top:1px solid #bbb;padding-top:2mm;font-size:8pt;display:flex;justify-content:space-between;gap:6mm;background:white}.doc-footer span{flex:1}.doc-footer span:last-child{text-align:right}.print-section{padding-bottom:16mm}@media screen{body{max-width:210mm;margin:auto;padding:12mm;box-shadow:0 0 10px #ccc}.doc-footer{position:static;margin-top:15mm}.print-section{border-top:2px dashed #bbb;padding-top:8mm}}
@@ -603,6 +635,21 @@ const html=`<!doctype html><html lang='it'><head><meta charset='utf-8'><title>${
 .vt-attachment-page img{max-width:100%;width:auto;height:auto;max-height:222mm;object-fit:contain;display:block;margin:0 auto}
 .vt-unifilar-sheet{break-before:page!important;page-break-before:always;break-inside:avoid!important;} .vt-unifilar-sheet h2{margin:1mm 0 2mm!important;font-size:13pt;} .vt-unifilar-sheet .notice{margin:1mm 0 2mm;font-size:8pt;padding:1mm 2mm;} .vt-unifilar-sheet-svg{width:100%;max-width:180mm;page-break-inside:avoid;} .vt-unifilar-sheet-svg svg{display:block;width:100%;height:auto;} 
 @media print{.vt-attachment-page{page:auto;break-before:page!important;break-after:page!important}.vt-attachment-page img{max-height:222mm}}
+
+/* Allegato I definitivo: firme separate e blocchi indivisibili. */
+.vt-dico-law{text-align:right;font-size:8.5pt;color:#425368}
+.vt-allegato-1{font-size:9.25pt!important;line-height:1.27!important}
+.vt-allegato-1 h2{font-size:13.5pt;margin:4mm 0 2.5mm!important}
+.vt-allegato-1 h3{font-size:10.5pt;margin:3.3mm 0 1.2mm!important}
+.vt-allegato-1 p{margin:1.4mm 0!important}
+.vt-dico-declarations{padding-left:5mm;margin:1.5mm 0}
+.vt-dico-declarations li{margin:1mm 0}
+.vt-dico-signatures{display:grid;grid-template-columns:1fr 1fr;gap:10mm;margin:7mm 0 3mm;break-inside:avoid;page-break-inside:avoid;text-align:center}
+.vt-dico-signatures>div{min-height:27mm;display:flex;flex-direction:column;justify-content:space-between;align-items:center;font-size:9pt}
+.vt-dico-signatures p{font-weight:600}
+.vt-dico-signatures span{border-top:1px solid #17202a;padding-top:1mm;width:90%;font-size:8pt;color:#52616d}
+.vt-dico-warnings{font-size:8pt!important;break-inside:avoid}
+@media print{.vt-allegato-1{padding-bottom:10mm!important}.vt-dico-signatures{margin-top:7mm}}
 </style></head><body>${printIds.map(id=>id==='attachments'?realAttachmentHTML:printPart(id)).join('')}</body></html>`;
 w.document.open();w.document.write(html);w.document.close();w.focus();await Promise.all([...w.document.images].map(img=>img.complete?Promise.resolve():new Promise(resolve=>{img.onload=resolve;img.onerror=resolve;setTimeout(resolve,5000)})));setTimeout(()=>w.print(),450);}
 function goStep(step){if(!archiveView)save(false);archiveView=false;active=Math.max(0,Math.min(tabs.length-1,step));render();window.scrollTo(0,0)}
