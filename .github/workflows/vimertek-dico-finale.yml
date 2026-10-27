@@ -1,0 +1,285 @@
+name: "Vimer Tek Di.Co. 37/08 - rilascio finale 1.9.11"
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/vimertek-dico-finale.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: "Correggi, verifica e pubblica"
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - name: "Preleva repository corrente (senza sovrascrivere le correzioni 1.9.10b/c)"
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: "Node.js per verifica JavaScript e build"
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: "Aggiornamento conservativo del codice corrente"
+        env:
+          VIMERTEK_CI: "1"
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > /tmp/finalizza_dico.py <<'VT_DICO_PATCH_PY'
+          #!/usr/bin/env python3
+          """Patch conservativa Di.Co. Vimer Tek 1.9.11 (27/10/2026).
+          Non sostituisce l'app corrente; preserva tutte le altre correzioni,
+          comprese QPT/QPP e i circuiti esterni della v1.9.10b/c.
+          """
+          from pathlib import Path
+          import re, shutil, subprocess, sys, datetime, os
+          
+          MARKER='VIMERTEK_DICO_FINALE_1911_20261027'
+          path=Path('app.js')
+          if len(sys.argv)>1:
+              path=Path(sys.argv[1])
+          if not path.is_file():
+              sys.exit('ERRORE: app.js non trovato. Lancia il programma nella cartella della Di.Co.')
+          s=path.read_text(encoding='utf-8')
+          if MARKER in s:
+              print('OK: correzione finale già presente, nessuna modifica.');sys.exit(0)
+          anchors=['function ministerialDico(){','\nlet printIds=[];','async function printDocuments(ids){',
+                   "['ministerial','Di.Co. · modello ministeriale (bozza)']"]
+          for anchor in anchors:
+              if anchor not in s:
+                  sys.exit('VERSIONE INATTESA: manca il riferimento '+repr(anchor)+' — nessuna modifica. Mandare il file aggiornato per revisione.')
+          # Nuove funzioni conservate accanto al modello Allegato I.
+          new_fn = r'''// VIMERTEK_DICO_FINALE_1911_20261027: rilascio documento solo a dati completi.
+          function vtDicoDatiMancanti(){
+            const m=state.vtV1910?.ministerial||{};
+            const blanks=[];
+            const req=(label,value)=>{if(!String(value??'').trim())blanks.push(label)};
+            if(state.doc!=='Di.Co.' || state.declarationRole!=='Impresa installatrice')
+              blanks.push('Di.Co. rilasciata da impresa installatrice');
+            const co=String(state.company||'').trim();
+            if(!/vimer\s*tek/i.test(co))blanks.push('Ragione sociale Vimer Tek');
+            req('Firmatario / legale rappresentante',m.representative||state.issuerTechnician||state.technician);
+            req('Responsabile tecnico',state.technician);
+            req('Committente',state.client);
+            req('CF / P.IVA committente',state.clientTax);
+            req('Ubicazione',state.address);
+            if(!String(state.city||'').trim()||!String(state.province||'').trim())blanks.push('Comune e provincia dell’immobile');
+            req('Descrizione lavori',state.workDescription);
+            req('Sede impresa',state.companyAddress||m.headOffice);
+            req('Telefono impresa',state.companyPhone);
+            if(String(state.companyVat||'01760570885').replace(/\D/g,'')!=='01760570885')blanks.push('Partita IVA Vimer Tek');
+            req('Settore impiantistico',state.companySector||m.sector);
+            req('CCIAA / Albo',state.registryOffice||m.regOffice);
+            if(/^\s*\d+\s*$/.test(state.registryOffice||m.regOffice||''))blanks.push('CCIAA: indicare il nome, non il solo numero');
+            req('Numero iscrizione Registro imprese / Albo',state.registryNumber||m.regNo);
+            req('Norma tecnica applicata',state.technicalStandard||m.technicalStandard);
+            req('Progettista o redattore elaborato',state.projectAuthor||m.projectAuthor||(state.designers||[])[0]?.name);
+            req('Data e luogo di rilascio',state.dicoDate&&state.dicoPlace);
+            if(!(state.fruits||[]).some(x=>Number(x.qty)>0))blanks.push('Relazione materiali / punti impianto compilata');
+            if(!(state.circuits||[]).length&&!Array.isArray(state.schemaItems))blanks.push('Circuiti e schema impianto');
+            const v=verifyStore();
+            if(!String(v.date||'').trim())blanks.push('Data verifiche');
+            if(!String(v.instrumentNotes||'').trim())blanks.push('Strumento utilizzato e identificazione');
+            const actual=Object.values(v.items||{});
+            if(!actual.some(x=>x&&x.result==='Conforme'))blanks.push('Esiti delle verifiche realmente eseguite');
+            const remaining=verifyItems().filter(([id])=>!['Conforme','Non applicabile'].includes(verifyEntry(id).result));
+            if(remaining.length)blanks.push('Completare gli esiti delle verifiche: '+remaining.length+' non compilate');
+            if(actual.some(x=>x && x.result==='Non conforme'))blanks.push('Risoluzione esiti non conformi');
+            for(const [k,t] of [['dicoProjectVerified','Progetto e schema verificati'],['dicoMaterialsVerified','Relazione materiali verificata'],['dicoTestsVerified','Verifiche strumentali concluse'],['dicoCertVerified','Certificato requisiti tecnico-professionali allegato']]) {
+              if(state[k]!=='Si')blanks.push(t);
+            }
+            return [...new Set(blanks)];
+          }
+          function ministerialDico(){
+           const m=state.vtV1910?.ministerial||{};
+           const e=x=>esc(String(x??'').trim()||'________________');
+           const firm=m.representative||state.issuerTechnician||state.technician||'DECARO ALESSIO';
+           const company=/vimer\s*tek/i.test(state.company||'')?'VIMER TEK S.R.L.S.':(state.company||'');
+           const loc=[state.address,state.city,state.province].filter(Boolean).join(', ');
+           const sector=state.companySector||m.sector;
+           const standard=state.technicalStandard||m.technicalStandard;
+           const progettista=state.projectAuthor||m.projectAuthor||(state.designers||[])[0]?.name||state.technician;
+           const iscrizione=state.registryNumber||m.regNo;
+           const camera=state.registryOffice||m.regOffice;
+           const note=Array.isArray(state.attachments)?state.attachments.join('; '):'';
+           return `<section class='print-section ministerial-dico vt-allegato-1'>
+           <div class='vt-dico-law'>D.M. 37/2008 · Allegato I (modello aggiornato dal D.M. 19 maggio 2010)</div>
+           <h2>DICHIARAZIONE DI CONFORMITÀ DELL’IMPIANTO ALLA REGOLA DELL’ARTE</h2>
+           <p>Il sottoscritto <b>${e(firm)}</b>, titolare o legale rappresentante dell’impresa <b>${e(company)}</b>,
+           operante nel settore <b>${e(sector)}</b>, con sede in <b>${e(state.companyAddress||m.headOffice)}</b>,
+           tel. <b>${e(state.companyPhone)}</b>, P. IVA <b>${e(state.companyVat||'01760570885')}</b>,
+           iscritta nel Registro delle Imprese / Albo delle imprese artigiane della C.C.I.A.A. di <b>${e(camera)}</b>,
+           n. <b>${e(iscrizione)}</b>, esecutrice dell’impianto di seguito descritto:</p>
+           <p><b>Impianto:</b> ${e(state.workDescription)}<br>
+           <b>Committente:</b> ${e(state.client)} · CF/P.IVA ${e(state.clientTax)}<br>
+           <b>Edificio / unità immobiliare:</b> ${e(loc)}<br>
+           <b>Destinazione d’uso:</b> ${e(state.use)} · <b>Tipo intervento:</b> ${e(state.work)}<br>
+           <b>Impianto elettrico:</b> ${e(state.phase)} ${e(state.voltage)}, sistema ${e(state.earth)}</p>
+           <h3>DICHIARA</h3>
+           <p>Sotto la propria personale responsabilità, che l’impianto è stato realizzato in modo conforme alla regola dell’arte secondo quanto previsto dall’art. 6 del D.M. 37/2008, tenuto conto delle condizioni di esercizio e degli usi cui è destinato l’edificio, avendo in particolare:</p>
+           <ul class='vt-dico-declarations'>
+           <li>rispettato il progetto, redatto ai sensi dell’art. 5 da <b>${e(progettista)}</b>;</li>
+           <li>seguito la norma tecnica applicabile all’impiego: <b>${e(standard)}</b>;</li>
+           <li>installato componenti e materiali adatti al luogo di installazione;</li>
+           <li>controllato l’impianto ai fini della sicurezza e della funzionalità, con esito positivo, eseguendo le verifiche richieste dalle norme e dalla legge.</li>
+           </ul>
+           <h3>ALLEGATI OBBLIGATORI</h3>
+           <p>□ Progetto ai sensi degli artt. 5 e 7 (e relative varianti ove previste);<br>
+           □ Relazione con tipologie dei materiali utilizzati;<br>
+           □ Schema dell’impianto realizzato;<br>
+           □ Riferimento a dichiarazioni di conformità precedenti o parziali, già esistenti, ove pertinenti;<br>
+           □ Copia del certificato di riconoscimento dei requisiti tecnico-professionali.</p>
+           <p><b>Allegati facoltativi:</b> ${e(note||'Nessuno')}</p>
+           <h3>DECLINA</h3>
+           <p>Ogni responsabilità per sinistri a persone o cose derivanti da manomissioni dell’impianto da parte di terzi ovvero da carenze di manutenzione o riparazione.</p>
+           <p><b>Data:</b> ${e(state.dicoDate)} &nbsp; <b>Luogo:</b> ${e(state.dicoPlace)}</p>
+           <div class='vt-dico-signatures'>
+           <div><b>IL RESPONSABILE TECNICO</b><p>${e(state.technician)}</p><span>Timbro e firma</span></div>
+           <div><b>IL DICHIARANTE</b><p>${e(firm)}</p><span>Timbro e firma</span></div>
+           </div>
+           <p class='vt-dico-warnings'><b>Avvertenze per il committente:</b> responsabilità del committente e del proprietario secondo l’art. 8 del D.M. 37/2008.</p>
+           </section>`;
+          }
+          '''
+          start=s.index('function ministerialDico(){')
+          end=s.index('\nlet printIds=[];',start)
+          s=s[:start]+new_fn+s[end:]
+          # Consenti il PDF Allegato I esclusivamente a dati completi.
+          needle='async function printDocuments(ids){'
+          assert s.count(needle)==1
+          s=s.replace(needle,needle+"\n if(state.doc==='Di.Co.' && ids.includes('ministerial')){const mancanti=vtDicoDatiMancanti();if(mancanti.length){alert('DICHIARAZIONE NON EMETTIBILE. Prima di stampare il modello Di.Co. completare e verificare:\\n\\n• '+mancanti.join('\\n• '));return;}}\n",1)
+          # Titoli: il documento valido non è presentato come bozza, né viene stampato con stampo "bozza".
+          s=s.replace("['ministerial','Di.Co. · modello ministeriale (bozza)']","['ministerial','Di.Co. · Allegato I D.M. 37/2008']",1)
+          s=s.replace('Dati aggiuntivi Di.Co. ministeriale (bozza)','Dati della Di.Co. · Allegato I ministeriale',1)
+          s=s.replace('La dichiarazione ministeriale resta una bozza operativa da verificare. La copertina definitiva non è stata modificata.',
+          '''Il modello Allegato I si stampa soltanto quando i dati e le verifiche richiesti sono stati confermati. Restano necessarie le firme e la documentazione tecnica effettiva. La copertina non è stata modificata.''',1)
+          s=s.replace('Firma del responsabile tecnico${esc(state.technician||\'\')}',"Firma del responsabile tecnico<br>${esc(state.technician||'')}",1)
+          # Corregge anche la ragione sociale nella scheda riepilogativa, non solo nell'Allegato I.
+          s=s.replace("entry('Soggetto dichiarante',state.issuerCompany||state.company)",
+          "entry('Soggetto dichiarante',state.doc==='Di.Co.'&&state.declarationRole==='Impresa installatrice'?'VIMER TEK S.R.L.S.':(state.issuerCompany||state.company))",1)
+          # Campi aggiuntivi indispensabili, inseriti senza alterare quelli già presenti.
+          needle="${field('companyVat','P. IVA impresa','Partita IVA impresa.')}"
+          insert=("${field('companyPhone','Telefono impresa','Recapito telefonico sede aziendale.')}"
+                  "${field('companySector','Settore impiantistico','Settore effettivo dell’abilitazione impresa.')}"
+                  "${field('technicalStandard','Norme tecniche applicate','Indicare norme effettivamente utilizzate, dopo verifica tecnica.')}"
+                  "${field('projectAuthor','Redattore del progetto / schema','Indicare il progettista oppure il responsabile tecnico se competente e ammesso.')}"
+                  )
+          if needle in s:
+              s=s.replace(needle,needle+insert,1)
+          else:
+              sys.exit('CAMPO DI.CO. NON TROVATO: il programma non è stato modificato.')
+          # Checkbox di responsabilità: conferma manuale, mai preselezionata dal sistema.
+          checkfields='''<div class='wide'><h3>Controlli prima dell’emissione definitiva</h3><p class='muted'>Selezionare Sì soltanto dopo aver realmente verificato documenti, misure e allegati; il programma non li certifica.</p></div>${[['dicoProjectVerified','Progetto e schema verificati'],['dicoMaterialsVerified','Materiali conformi e relazione completata'],['dicoTestsVerified','Verifiche e misure eseguite con esito positivo'],['dicoCertVerified','Certificato camerale requisiti tecnico-professionali allegato']].map(([key,label])=>`<label>${label}<select data-k='${key}'><option value='' ${!state[key]?'selected':''}>Da verificare</option><option value='Si' ${state[key]==='Si'?'selected':''}>Sì</option><option value='No' ${state[key]==='No'?'selected':''}>No</option></select></label>`).join('')}'''
+          # Inserisce nelle sole proprietà Di.Co. prima di chiudere il ramo condizionale.
+          needle="${field('dicoPlace','Luogo dichiarazione','Luogo di sottoscrizione.')}"
+          assert needle in s
+          s=s.replace(needle,needle+checkfields,1)
+          # CSS dedicato alla pagina ministeriale; evitare firma sovrapposta e interruzioni nel riquadro.
+          needle='</style></head><body>${printIds.map('
+          css='''
+          /* Allegato I definitivo: firme separate e blocchi indivisibili. */
+          .vt-dico-law{text-align:right;font-size:8.5pt;color:#425368}
+          .vt-allegato-1{font-size:9.25pt!important;line-height:1.27!important}
+          .vt-allegato-1 h2{font-size:13.5pt;margin:4mm 0 2.5mm!important}
+          .vt-allegato-1 h3{font-size:10.5pt;margin:3.3mm 0 1.2mm!important}
+          .vt-allegato-1 p{margin:1.4mm 0!important}
+          .vt-dico-declarations{padding-left:5mm;margin:1.5mm 0}
+          .vt-dico-declarations li{margin:1mm 0}
+          .vt-dico-signatures{display:grid;grid-template-columns:1fr 1fr;gap:10mm;margin:7mm 0 3mm;break-inside:avoid;page-break-inside:avoid;text-align:center}
+          .vt-dico-signatures>div{min-height:27mm;display:flex;flex-direction:column;justify-content:space-between;align-items:center;font-size:9pt}
+          .vt-dico-signatures p{font-weight:600}
+          .vt-dico-signatures span{border-top:1px solid #17202a;padding-top:1mm;width:90%;font-size:8pt;color:#52616d}
+          .vt-dico-warnings{font-size:8pt!important;break-inside:avoid}
+          @media print{.vt-allegato-1{padding-bottom:10mm!important}.vt-dico-signatures{margin-top:7mm}}
+          '''
+          if needle not in s:
+              sys.exit('STRUTTURA CSS NON TROVATA: nessuna modifica al file originale.')
+          s=s.replace(needle,css+needle,1)
+          # Versione visibile nel modulo Fascicolo, senza intervenire sul layout generale.
+          s=s.replace('Stampa fascicolo tecnico</h2>', 'Stampa fascicolo tecnico · v1.9.11</h2>',1)
+          # Default ragione sociale normalizzata, senza toccare pratiche esistenti salvate dall'utente.
+          s=s.replace("company:'Vimer Tek Srls'","company:'VIMER TEK S.R.L.S.'",1)
+          # Verifica su una copia temporanea, prima di cambiare il sorgente reale.
+          tmp=path.with_name('.app_js_vt_final_verify.js')
+          tmp.write_text(s,encoding='utf-8')
+          try:
+              chk=subprocess.run(['node','--check',str(tmp)],capture_output=True,text=True,timeout=30)
+              if chk.returncode:
+                  sys.exit('ERRORE JS: nessuna modifica.\n'+chk.stderr)
+              backup=path.with_name(path.stem+'_backup_'+datetime.datetime.now().strftime('%Y%m%d_%H%M%S')+path.suffix)
+              if os.getenv('VIMERTEK_CI')!='1':
+                  shutil.copyfile(path,backup)
+              path.write_text(s,encoding='utf-8')
+              print('OK: Di.Co. Allegato I aggiornato con blocco rilascio se incompleta.')
+              print('OK: ragione sociale, dichiaranti e firme separate.')
+              print('OK: codice JavaScript verificato con node --check.')
+              if os.getenv('VIMERTEK_CI')!='1': print('Backup:',backup)
+              print('File aggiornato:',path)
+          finally:
+              tmp.unlink(missing_ok=True)
+          VT_DICO_PATCH_PY
+          python /tmp/finalizza_dico.py app.js
+          node --check app.js
+          if ! grep -q 'VIMERTEK_DICO_FINALE_1911_20261027' app.js; then
+            echo 'ERRORE: correzione non rilevata'; exit 1
+          fi
+          if grep -q 'BOZZA DA COMPLETARE E VERIFICARE' app.js; then
+            echo 'ERRORE: ancora presente il vecchio modello ministeriale'; exit 1
+          fi
+      - name: "Registra correzioni in GitHub"
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app.js
+          if ! git diff --cached --quiet; then
+            git commit -m "fix(dico): emissione Allegato I verificata, stampa e firme"
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          else
+            echo 'La versione finale era già presente.'
+          fi
+      - name: "Costruisce sito senza perdere logo, copertina e schemi"
+        id: site
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -f package.json ]]; then
+            if [[ -f package-lock.json ]]; then npm ci; else npm install --no-audit --no-fund; fi
+            npm run build
+            if [[ -d dist ]]; then
+              echo 'path=dist' >> "$GITHUB_OUTPUT"
+            elif [[ -d build ]]; then
+              echo 'path=build' >> "$GITHUB_OUTPUT"
+            else
+              echo 'ERRORE: cartella di build non trovata.'; exit 1
+            fi
+          elif [[ -f index.html ]]; then
+            mkdir -p _vimertek_site
+            rsync -a --exclude='.git' --exclude='.github' --exclude='*.py' --exclude='*.zip' ./ _vimertek_site/
+            echo 'path=_vimertek_site' >> "$GITHUB_OUTPUT"
+          else
+            echo 'ERRORE: non trovo package.json o index.html, rilascio annullato.'; exit 1
+          fi
+      - name: "Configura GitHub Pages"
+        uses: actions/configure-pages@v5
+      - name: "Carica i file del sito"
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ${{ steps.site.outputs.path }}
+      - name: "Pubblica GitHub Pages"
+        id: deploy
+        uses: actions/deploy-pages@v4
