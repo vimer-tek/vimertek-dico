@@ -258,7 +258,10 @@ function unifilarSVGLegacy(){
  const signatureBlock=`<rect x="${signatureX}" y="${signatureY}" width="${signatureW}" height="${signatureH}" fill="white" stroke="#24344c" stroke-width="1.5"/>${label(signatureX+18,signatureY+25,'FIRMA DEL DIRETTORE TECNICO',12,'start',true)}${label(signatureX+18,signatureY+49,`Nominativo: ${signedBy}`,11,'start')}${label(signatureX+18,signatureY+78,'Firma:',11,'start')}<path d="M${signatureX+82} ${signatureY+123} L${signatureX+signatureW-20} ${signatureY+123}" stroke="#24344c" stroke-width="1.2" fill="none"/>${label(signatureX+18,signatureY+145,'Data: ____/____/________',10,'start')}`;
  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" role="img" aria-label="Schema unifilare preliminare"><rect x="1" y="1" width="${width-2}" height="${height-2}" fill="white" stroke="#263442"/>${label(25,29,`SCHEMA UNIFILARE · ${state.practiceNo||''}`,17,'start',true)}${label(25,51,`Sistema ${state.earth||''} · ${state.phase||''} · ${state.voltage||''} · ${state.power||''} kW`,11,'start')}${sections.join('')}${signatureBlock}${label(25,height-16,'VIMER TEK · Schema preliminare da verificare e validare tecnicamente',10,'start')}</svg>`;
 }
-// VT_UNIFILARE_GERARCHICO_V1910A - schema preliminare: dispositivi a monte / partenze.
+// VT_UNIFILARE_GERARCHICO_V1910B - configurazione QPT / QPP / Giardino.
+// La topologia a tre rami si attiva SOLO quando QPT-07/08/09 sono presenti
+// nel quadro generale, insieme a QPT-GEN e al montante QPT-PP verso QPP.
+// In ogni altra pratica resta attivo il disegno gerarchico della v1.9.10a.
 // Mostra una sola volta ogni protezione di montante; l'alimentazione del quadro
 // secondario e' richiamata con testo, non con un secondo simbolo RCBO.
 function vtSchemaHierarchicSupported(){
@@ -319,10 +322,55 @@ function unifilarSVG(onlyBoard=''){
   const own=cs.filter(c=>(c.board||'QG')===id);
   const source=own.find(c=>isGen(c));
   const feedItems=id==='QG'?feeders:[];
-  const exclude=new Set([source,...matchedFeederCircuits]);
+  // QPT-07 is a third, independently protected upstream branch,
+  // with QPT-08 and QPT-09 electrically DOWNSTREAM of its RCBO.
+  const garden=id==='QG'?own.find(c=>/^QPT-07\b/i.test(String(c.name||''))):null;
+  const gardenLights=id==='QG'?own.find(c=>/^QPT-08\b/i.test(String(c.name||''))):null;
+  const gardenSockets=id==='QG'?own.find(c=>/^QPT-09\b/i.test(String(c.name||''))):null;
+  const gardenTopology=!!(garden && gardenLights && gardenSockets && source && feedItems.length===1);
+  const exclude=new Set([source,...matchedFeederCircuits,...(gardenTopology?[garden,gardenLights,gardenSockets]:[])]);
   const items=own.filter(c=>!exclude.has(c));
   let s='', y=0;
   if(id==='QG'){
+   if(gardenTopology){
+    // Three independent branches upstream of the floor's local distribution:
+    // QPT-GEN -> internal circuits; QPT-PP -> QPP; QPT-07 -> QPT-08/09.
+    const topY=179,topBusY=148,branchXs=[188,480,772];
+    s+=text(margin,30,'QUADRO PIANO TERRA / DISTRIBUZIONE PRINCIPALE (QG)',16,'start',true);
+    s+=text(margin,51,'Sistema '+(state.earth||'?')+' · '+(state.phase||'?')+' · '+(state.voltage||'?')+' · '+(state.power||'?')+' kW',12,'start');
+    s+=`<rect x="350" y="73" width="260" height="31" fill="#f2f5fa" stroke="#8795a7"/>`+text(480,94,'RETE / ALIMENTAZIONE',12,'middle',true);
+    s+=text(480,122,general.prot?'Protezione a monte: '+general.prot:'Protezione a monte: da verificare',11);
+    s+=line(480,105,480,topBusY)+line(branchXs[0],topBusY,branchXs[2],topBusY);
+    const upstream=[source,feedItems[0].circuit,garden];
+    upstream.forEach((c,i)=>{
+      const x=branchXs[i];
+      s+=line(x,topBusY,x,topY)+schemaDevice(x,topY,c?.device||'MTD');
+      s+=multi(x,244,c?.name||'Partenza da identificare',12.5,28,2);
+      s+=multi(x,278,c?.prot||(i===1?feedItems[0].board.feed:'Protezione da verificare'),10.8,31,3);
+    });
+    s+=text(branchXs[1],323,'→ '+(feedItems[0].board.name||feedItems[0].board.id)+' ('+feedItems[0].board.id+')',11.5,'middle',true);
+    // The central QPT-PP branch terminates at QPP; its RCBO is NOT redrawn there.
+    s+=line(branchXs[1],224,branchXs[1],230);
+    // Branch QPT-GEN: 6 local circuits, grouped 2 per row, on a dedicated bus.
+    s+=text(108,348,'A VALLE DI '+source.name,11,'start',true);
+    s+=line(branchXs[0],224,branchXs[0],328)+line(branchXs[0],328,107,328)+line(107,328,107,730);
+    const localXs=[205,397],localBusYs=[382,554,726];
+    items.forEach((c,i)=>{
+      const r=Math.floor(i/2),col=i%2,busY=localBusYs[r],x=localXs[col];
+      if(col===0)s+=line(107,busY,localXs[1],busY);
+      s+=line(x,busY,x,busY+20)+deviceBlock(c,x,busY+20);
+    });
+    // Independently protected garden branch QPT-07 (C20/30mA):
+    // only lights QPT-08 and sockets QPT-09 lie downstream.
+    s+=text(590,348,'A VALLE DI '+garden.name,11,'start',true);
+    s+=line(branchXs[2],224,branchXs[2],365)+line(601,365,859,365);
+    [[gardenLights,665],[gardenSockets,860]].forEach(([c,x])=>{
+      s+=line(x,365,x,392)+deviceBlock(c,x,392);
+    });
+    // Visual separator does not represent an electrical connection.
+    s+=`<path d="M518 349 V857" stroke="#c5cfda" stroke-width="1" stroke-dasharray="4 6"/>`;
+    y=905;
+   }else{
    const hasFeed=feedItems.length>0;
    const generalX=hasFeed?257:480,feederX=hasFeed?735:480;
    s+=text(margin,30,'QUADRO PIANO TERRA / DISTRIBUZIONE PRINCIPALE (QG)',16,'start',true);
@@ -352,6 +400,8 @@ function unifilarSVG(onlyBoard=''){
    s+=text(102,startY-38,source?'PARTENZE A VALLE DI '+source.name:'PARTENZE QG: TOPOLOGIA DA VERIFICARE',11,'start',true);
    const rows=circuitRows(items,startY,generalX);
    s+=rows.svg;y=rows.bottom+22;
+   }
+
   }else{
    const linked=feeders.find(f=>f.board.id===id),feeder=linked?.circuit;
    s+=text(margin,30,`${board.name||id} (${id})`,16,'start',true);
