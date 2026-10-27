@@ -9,6 +9,7 @@ const files = [
   "firma-vimertek-solo-grafica.js",
   "assets/pdf.min.mjs",
   "assets/pdf.worker.min.mjs",
+  "assets/logo-vimertek.png",
   "assets/copertina-vimertek-definitiva.png",
   "assets/copertina-vimertek-modello.png",
   "assets/copertina-vimertek-pulita.png"
