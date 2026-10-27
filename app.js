@@ -168,7 +168,7 @@ function schemaDevice(x,y,type){let t=String(type||'MT').toUpperCase(),line=`<pa
  else if(['EM','ANL','VM','AM'].includes(t))symbol=`<circle cx="${x}" cy="${y+22}" r="15" fill="none" stroke="#24344c" stroke-width="1.7"/><text x="${x}" y="${y+26}" text-anchor="middle" font-size="9">${['VM','AM'].includes(t)?t[0]:'M'}</text>`;
  else if(['TRAFO','PSU','UPS','INV'].includes(t))symbol=`<circle cx="${x-7}" cy="${y+22}" r="9" fill="none" stroke="#24344c"/><circle cx="${x+7}" cy="${y+22}" r="9" fill="none" stroke="#24344c"/>`;
  return `<rect x="${x-21}" y="${y}" width="42" height="45" fill="white" stroke="#24344c" stroke-width="1.7"/>${symbol}<text x="${x}" y="${y-7}" text-anchor="middle" font-size="${t.length>5?8:10}" fill="#25344a">${esc(t)}</text>`}
-function unifilarSVG(){
+function unifilarSVGLegacy(){
  const cs=schemaItems(), groups=schemaGroups(), boards=schemaBoards(), general=schemaGeneral();
  const safe=v=>esc(String(v??''));
  const line=(a,b,c,d)=>`<path d="M${a} ${b} L${c} ${d}" fill="none" stroke="#24344c" stroke-width="1.7"/>`;
@@ -258,6 +258,135 @@ function unifilarSVG(){
  const signatureBlock=`<rect x="${signatureX}" y="${signatureY}" width="${signatureW}" height="${signatureH}" fill="white" stroke="#24344c" stroke-width="1.5"/>${label(signatureX+18,signatureY+25,'FIRMA DEL DIRETTORE TECNICO',12,'start',true)}${label(signatureX+18,signatureY+49,`Nominativo: ${signedBy}`,11,'start')}${label(signatureX+18,signatureY+78,'Firma:',11,'start')}<path d="M${signatureX+82} ${signatureY+123} L${signatureX+signatureW-20} ${signatureY+123}" stroke="#24344c" stroke-width="1.2" fill="none"/>${label(signatureX+18,signatureY+145,'Data: ____/____/________',10,'start')}`;
  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" role="img" aria-label="Schema unifilare preliminare"><rect x="1" y="1" width="${width-2}" height="${height-2}" fill="white" stroke="#263442"/>${label(25,29,`SCHEMA UNIFILARE · ${state.practiceNo||''}`,17,'start',true)}${label(25,51,`Sistema ${state.earth||''} · ${state.phase||''} · ${state.voltage||''} · ${state.power||''} kW`,11,'start')}${sections.join('')}${signatureBlock}${label(25,height-16,'VIMER TEK · Schema preliminare da verificare e validare tecnicamente',10,'start')}</svg>`;
 }
+// VT_UNIFILARE_GERARCHICO_V1910A - schema preliminare: dispositivi a monte / partenze.
+// Mostra una sola volta ogni protezione di montante; l'alimentazione del quadro
+// secondario e' richiamata con testo, non con un secondo simbolo RCBO.
+function vtSchemaHierarchicSupported(){
+ const b=schemaBoards(),items=schemaItems();
+ return schemaGroups().length===0 && b.length===1 && /QPP/i.test(String(b[0].name||'')) && items.some(c=>/^QPT-GEN\b/i.test(c.name||'') && (c.board||'QG')==='QG') && items.some(c=>/^QPP-GEN\b/i.test(c.name||'') && c.board===b[0].id) && items.some(c=>/^QPT-PP\b/i.test(c.name||'') && (c.board||'QG')==='QG');
+}
+function unifilarSVG(onlyBoard=''){
+ if(!vtSchemaHierarchicSupported())return unifilarSVGLegacy();
+ const cs=schemaItems(), boards=schemaBoards(), groups=schemaGroups(), general=schemaGeneral();
+ const defs=[{id:'QG',name:'Quadro generale'},...boards];
+ const W=960, C=[208,480,752], rowHeight=153, margin=36;
+ const safe=v=>esc(String(v??''));
+ const line=(x1,y1,x2,y2,dash='')=>`<path d="M${x1} ${y1} L${x2} ${y2}" fill="none" stroke="#24344c" stroke-width="1.8"${dash?' stroke-dasharray="5 3"':''}/>`;
+ const text=(x,y,v,size=12,anchor='middle',bold=false)=>`<text x="${x}" y="${y}" font-family="Arial,sans-serif" font-size="${size}" text-anchor="${anchor}" fill="#25344a"${bold?' font-weight="bold"':''}>${safe(v)}</text>`;
+ const words=(v,maxChars,maxLines=2)=>{
+  const src=String(v??'').replace(/\s+/g,' ').trim();if(!src)return [];
+  const out=[];let buf='';for(const w of src.split(' ')){if((buf+' '+w).trim().length<=maxChars){buf=(buf+' '+w).trim();continue;}if(buf)out.push(buf);buf=w;}
+  if(buf)out.push(buf);
+  const fitted=[];for(const l of out){if(l.length<=maxChars)fitted.push(l);else for(let i=0;i<l.length;i+=maxChars)fitted.push(l.slice(i,i+maxChars));}
+  if(fitted.length>maxLines){fitted.length=maxLines;fitted[maxLines-1]=fitted[maxLines-1].slice(0,Math.max(1,maxChars-1))+'…';}
+  return fitted;
+ };
+ const multi=(x,y,v,size=12,maxChars=34,maxLines=2)=>words(v,maxChars,maxLines).map((z,i)=>text(x,y+i*15,z,size)).join('');
+ const isGen=c=>/(^|[\s-])GEN(?:ERALE)?(?=$|[\s-])/i.test(String(c.name||'')) || /^GENERALE\b/i.test(String(c.name||''));
+ const matchesFeeder=(c,b)=>{const n=String(c.name||'').toUpperCase(),dest=String(c.dest||'').toUpperCase(),code=String(b.name||'').toUpperCase();return n.startsWith('QPT-PP')&&code.includes('QPP') || (n.includes('MONTANTE') && ((code && dest.includes(code))||dest.includes('QUADRO'))) || (dest.includes('ALIMENTAZIONE QUADRO') && code && dest.includes(code));};
+ const feedFor=(b)=>cs.find(c=>(c.board||'QG')==='QG' && matchesFeeder(c,b));
+ // Board feeders are identified by the saved circuit where possible.
+ const feeders=boards.map(b=>({board:b,circuit:feedFor(b)}));
+ const matchedFeederCircuits=new Set(feeders.map(z=>z.circuit).filter(Boolean));
+ const deviceBlock=(c,x,top,options={})=>{
+  let s=schemaDevice(x,top,c.device||(/MTD|DIFF/i.test(c.prot||'')?'MTD':'MT'));
+  s+=multi(x,top+61,c.name||'Circuito',12.5,33,2);
+  s+=multi(x,top+92,c.prot||'Protezione da verificare',11,38,2);
+  if(!options.noCable)s+=multi(x,top+124,c.cable||'Cavo da indicare',10.5,41,2);
+  return s;
+ };
+ const circuitRows=(items,startY,parentX)=>{
+  if(!items.length)return {svg:text(480,startY+35,'Nessuna partenza secondaria registrata',12),bottom:startY+80};
+  let out='',busX=89;
+  const rows=Math.ceil(items.length/3);
+  // The vertical riser is wired to the output of the protective device upstream.
+  out+=line(parentX,startY-38,parentX,startY-14)+line(parentX,startY-14,busX,startY-14);
+  out+=line(busX,startY-14,busX,startY+(rows-1)*rowHeight+19);
+  for(let r=0;r<rows;r++){
+   const slice=items.slice(r*3,(r+1)*3),busY=startY+r*rowHeight+19,devY=busY+22;
+   out+=line(busX,busY,C[slice.length-1],busY);
+   slice.forEach((c,i)=>{out+=line(C[i],busY,C[i],devY)+deviceBlock(c,C[i],devY);});
+  }
+  return {svg:out,bottom:startY+(rows-1)*rowHeight+22+146};
+ };
+ const signature=()=>{
+  const signed=state.technician||state.issuerTechnician||'Da compilare';
+  const x=453,y=0,w=467,h=121;
+  return (at)=>`<rect x="${x}" y="${at}" width="${w}" height="${h}" fill="white" stroke="#24344c" stroke-width="1.4"/>${text(x+15,at+23,'FIRMA DEL DIRETTORE TECNICO',12,'start',true)}${text(x+15,at+44,'Nominativo: '+signed,11,'start')}${text(x+15,at+67,'Firma:',11,'start')}${line(x+81,at+94,x+w-18,at+94)}${text(x+15,at+113,'Data: ____/____/________',10,'start')}`;
+ };
+ function panel(board){
+  const id=board.id;
+  const own=cs.filter(c=>(c.board||'QG')===id);
+  const source=own.find(c=>isGen(c));
+  const feedItems=id==='QG'?feeders:[];
+  const exclude=new Set([source,...matchedFeederCircuits]);
+  const items=own.filter(c=>!exclude.has(c));
+  let s='', y=0;
+  if(id==='QG'){
+   const hasFeed=feedItems.length>0;
+   const generalX=hasFeed?257:480,feederX=hasFeed?735:480;
+   s+=text(margin,30,'QUADRO PIANO TERRA / DISTRIBUZIONE PRINCIPALE (QG)',16,'start',true);
+   s+=text(margin,51,'Sistema '+(state.earth||'?')+' · '+(state.phase||'?')+' · '+(state.voltage||'?')+' · '+(state.power||'?')+' kW',12,'start');
+   s+=`<rect x="350" y="73" width="260" height="31" fill="#f2f5fa" stroke="#8795a7"/>`+text(480,94,'RETE / ALIMENTAZIONE',12,'middle',true);
+   if(general.prot){s+=text(480,122,'Protezione generale QG: '+general.prot,11);}else{s+=text(480,122,'Protezione a monte: da verificare',11);}
+   s+=line(480,105,480,148);
+   if(hasFeed){s+=line(generalX,148,feederX,148);}
+   s+=line(generalX,148,generalX,179);
+   if(source){s+=schemaDevice(generalX,179,source.device||'MTD');s+=multi(407,244,source.name,13,25,2)+multi(407,273,source.prot,11,31,2);s+=line(generalX,224,generalX,310);}
+   else{s+=`<rect x="${generalX-126}" y="179" width="252" height="52" fill="white" stroke="#9ba9bb" stroke-dasharray="5 3"/>`+text(generalX,198,'Generale ramo piano terra',11)+text(generalX,215,'Da identificare',11);}
+   if(hasFeed){
+    s+=line(feederX,148,feederX,179);
+    // One protective symbol for each distinct feeder. Never a second symbol in QPP.
+    feedItems.forEach(({board:b,circuit:c},j)=>{
+      if(j>0){/* multiple feeders share the upper bus, each at a separate horizontal slot */}
+      if(j===0){
+       s+=schemaDevice(feederX,179,c?.device||'MTD');
+       s+=multi(feederX,243,c?.name||('Montante '+(b.name||b.id)),12.5,30,2);
+       s+=multi(feederX,274,c?.prot||b.feed||'Protezione da verificare',10.8,35,3);
+       s+=text(feederX,326,'→ '+(b.name||b.id)+' ('+b.id+')',12,'middle',true);
+       s+=line(feederX,224,feederX,232);
+      }
+    });
+   }
+   const startY=348;
+   s+=text(102,startY-38,source?'PARTENZE A VALLE DI '+source.name:'PARTENZE QG: TOPOLOGIA DA VERIFICARE',11,'start',true);
+   const rows=circuitRows(items,startY,generalX);
+   s+=rows.svg;y=rows.bottom+22;
+  }else{
+   const linked=feeders.find(f=>f.board.id===id),feeder=linked?.circuit;
+   s+=text(margin,30,`${board.name||id} (${id})`,16,'start',true);
+   s+=text(margin,53,`Alimentazione dal quadro generale — montante ${feeder?.name||'da identificare'}`,12,'start');
+   s+=multi(480,79,board.cable||feeder?.cable||'Cavo montante da indicare',11,95,2);
+   // Only a dashed reference arrow: the feeder protective device is drawn in QG.
+   s+=line(480,109,480,160,'dash');
+   if(source){s+=schemaDevice(480,160,source.device||'MTD');s+=multi(665,197,source.name,13,29,2);s+=multi(665,228,source.prot,11,30,2);s+=line(480,205,480,291);}
+   else{s+=`<rect x="345" y="160" width="270" height="48" fill="white" stroke="#9ba9bb" stroke-dasharray="5 3"/>`+text(480,178,'Generale quadro da verificare',12)+text(480,194,'Non identificato nei circuiti',11);}
+   s+=text(102,302,'PARTENZE A VALLE DEL GENERALE DEL QUADRO',11,'start',true);
+   const rows=circuitRows(items,329,480);s+=rows.svg;y=rows.bottom+18;
+  }
+  // Deliberately do not draw duplicate 'virtual' feeder nodes as independent devices.
+  const H=y+28;
+  const svg=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="Schema preliminare ${safe(board.name||id)}"><rect x="1" y="1" width="${W-2}" height="${H-2}" fill="white" stroke="#263442"/>${s}${text(28,H-13,'VIMER TEK · Schema da verificare rispetto ai collegamenti reali',10,'start')}</svg>`;
+  return {board,svg,body:s,height:H};
+ }
+ const visible=onlyBoard?defs.filter(b=>b.id===onlyBoard):defs;
+ const panels=visible.map(panel);
+ const header=68,space=18;
+ const sigH=onlyBoard && onlyBoard!==(defs.at(-1)?.id)?0:153;
+ const height=header+panels.reduce((n,p)=>n+p.height+space,0)+sigH+20;
+ let y=header,inner=`<rect x="1" y="1" width="${W-2}" height="${height-2}" fill="white" stroke="#263442"/>`;
+ inner+=text(27,29,'SCHEMA UNIFILARE · '+(state.practiceNo||''),17,'start',true);
+ inner+=text(27,52,'Rappresentazione gerarchica preliminare — verificare alimentazioni, protezioni e selettività',11,'start');
+ for(const p of panels){inner+=`<svg x="0" y="${y}" width="${W}" height="${p.height}" viewBox="0 0 ${W} ${p.height}">${p.body}</svg>`;y+=p.height+space;}
+ if(sigH)inner+=signature()(y+10);
+ inner+=text(27,height-13,'VIMER TEK · Elaborato da validare prima dell’utilizzo professionale',10,'start');
+ return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${height}" width="${W}" height="${height}" role="img" aria-label="Schema unifilare preliminare">${inner}</svg>`;
+}
+function unifilarPrintPages(){
+ if(!vtSchemaHierarchicSupported())return `<section class="print-section"><h2>Schema unifilare · ${esc(state.practiceNo||'')}</h2><p class="notice">Configurazione avanzata: schema preliminare da validare.</p><div class="vt-unifilar-sheet-svg">${unifilarSVGLegacy().replace(/width="\d+" height="\d+" role=/,'width="100%" height="auto" role=')}</div></section>`;
+ const defs=[{id:'QG',name:'Quadro generale'},...schemaBoards()];
+ return defs.map((b,i)=>`<section class="print-section vt-unifilar-sheet"><h2>Schema unifilare · ${esc(state.practiceNo||'')} — ${esc(b.name||b.id)}</h2><p class="notice">Elaborato preliminare: verificare protezioni, collegamenti, selettività e dati prima dell’uso professionale.</p><div class="vt-unifilar-sheet-svg">${unifilarSVG(b.id).replace(/width="\d+" height="\d+" role=/,'width="100%" height="auto" role=')}</div></section>`).join('');
+}
 function refreshSchema(){let d=document.getElementById('schemaPreview');if(d)d.innerHTML=unifilarSVG()}
 function unifilar(){
  let a=schemaItems(),g=schemaGeneral(),groups=schemaGroups(),boards=schemaBoards(),boardOptions=[['QG','Quadro generale'],...boards.map(b=>[b.id,b.name||b.id])],groupOptions=[['','Nessun gruppo'],...groups.map(x=>[x.id,x.name||x.id])];
@@ -297,7 +426,7 @@ ${entry('Luogo dichiarazione',state.diriPlace)}
 `:''}<div class='print-signature'><span>Firma del responsabile tecnico${esc(state.technician||'')}<i></i></span></div></section>`;
 if(id==='materials')return `<section class='print-section'><h2>Relazione materiali e punti impianto</h2>${entry('Marca / serie prevalente',[state.brand,state.series].filter(Boolean).join(' / '))}${printableTable(['Locale','Marca','Serie','Tipologia','Quantità'],(state.fruits||[]).map(x=>[x.room,x.brand,x.series,x.type,x.qty]))}<p><strong>Totale frutti registrati:</strong> ${(state.fruits||[]).reduce((a,x)=>a+(Number(x.qty)||0),0)}</p></section>`;
 if(id==='circuits')return `<section class='print-section'><h2>Quadri e circuiti</h2>${entry('Distribuzione',state.earth)}${entry('Fasi',state.phase)}${entry('Tensione',state.voltage)}${printableTable(['Circuito','Protezione','Cavo','Destinazione'],(state.circuits||[]).map(x=>[x.name,x.prot,x.cable,x.dest]))}</section>`;
-if(id==='unifilar')return `<section class='print-section'><h2>Schema unifilare · ${esc(state.practiceNo)}</h2><p class='notice'>Elaborato grafico preliminare da verificare rispetto all’impianto reale. Le protezioni non vengono dimensionate automaticamente.</p><div style='width:100%;overflow:hidden'>${unifilarSVG().replace(/width="\d+" height="\d+" role=/,'width="100%" height="auto" role=')}</div><p>Alimentazione: ${esc(state.phase)} · ${esc(state.voltage)} · ${esc(state.earth)}</p></section>`;
+if(id==='unifilar')return unifilarPrintPages();
 if(id==='ministerial')return ministerialDico();
 
 if(id==='verification')return `<section class='print-section'><h2>Rapporto verifiche · CEI 64-8 Parte 6</h2>${entry('Modalità',v.mode==='dettagliata'?'Dettagliata':'Rapida')}${entry('Data',v.date)}${VERIFY_GROUPS.map(([group,items])=>`<div class='verification-group'><h3>${esc(group)}</h3>${printableTable(['Verifica','Esito','Circuito / valore / metodo / strumento','Note'],items.filter(([key])=>!isNotApplicable(verifyEntry(key).result)).map(([key,title])=>{let x=verifyEntry(key);return [title,x.result||'Da eseguire',[x.circuit,x.value?`${x.value} ${x.unit||VERIFY_UNITS[key]||''}`:'',x.method,x.instrument].filter(Boolean).join(' · '),x.notes||'']}))}</div>`).join('')}${entry('Strumenti',v.instrumentNotes)}${entry('Osservazioni',v.notes)}<p class='notice'>Le misure e gli esiti sono dichiarati dal compilatore e non verificati automaticamente dal software.</p><div class='print-signature'><span>Firma del responsabile tecnico${esc(state.technician||'')}<i></i></span></div></section>`;
@@ -421,6 +550,7 @@ const html=`<!doctype html><html lang='it'><head><meta charset='utf-8'><title>${
 .vt-attachment-page{break-before:page;page-break-before:always;break-inside:avoid;page-break-inside:avoid;padding:0!important;margin:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;min-height:0}
 .vt-attachment-title{width:100%;font:9pt Arial,sans-serif;color:#596571;border-bottom:1px solid #aab2bc;margin:0 0 3mm;padding-bottom:2mm;overflow-wrap:anywhere}
 .vt-attachment-page img{max-width:100%;width:auto;height:auto;max-height:222mm;object-fit:contain;display:block;margin:0 auto}
+.vt-unifilar-sheet{break-before:page!important;page-break-before:always;break-inside:avoid!important;} .vt-unifilar-sheet h2{margin:1mm 0 2mm!important;font-size:13pt;} .vt-unifilar-sheet .notice{margin:1mm 0 2mm;font-size:8pt;padding:1mm 2mm;} .vt-unifilar-sheet-svg{width:100%;max-width:180mm;page-break-inside:avoid;} .vt-unifilar-sheet-svg svg{display:block;width:100%;height:auto;} 
 @media print{.vt-attachment-page{page:auto;break-before:page!important;break-after:page!important}.vt-attachment-page img{max-height:222mm}}
 </style></head><body>${printIds.map(id=>id==='attachments'?realAttachmentHTML:printPart(id)).join('')}</body></html>`;
 w.document.open();w.document.write(html);w.document.close();w.focus();await Promise.all([...w.document.images].map(img=>img.complete?Promise.resolve():new Promise(resolve=>{img.onload=resolve;img.onerror=resolve;setTimeout(resolve,5000)})));setTimeout(()=>w.print(),450);}
