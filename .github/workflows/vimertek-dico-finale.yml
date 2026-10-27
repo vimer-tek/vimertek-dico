@@ -12,8 +12,9 @@ permissions:
   pages: write
   id-token: write
 
+# Gruppo indipendente: il deploy storico usa pages e cancella le altre esecuzioni.
 concurrency:
-  group: pages
+  group: vimertek-dico-final-release
   cancel-in-progress: false
 
 jobs:
