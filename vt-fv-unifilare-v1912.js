@@ -7,7 +7,8 @@
 const fvActive=()=>state.doc==='Di.Co.'&&state.installationType==='Fotovoltaico';
 const FIELDS=['vtPvNmoduli','vtPvWpModulo','vtPvStringhe','vtPvModuli','vtPvInverter',
  'vtPvPotenzaInverter','vtPvAccumulo','vtPvAccumuloKwh','vtPvDc','vtPvAc',
- 'vtPvInterfaccia','vtPvTerra','vtPvRete','vtPvMode','vtPvDoc','vtSchemaRif'];
+ 'vtPvInterfaccia','vtPvTerra','vtPvRete','vtPvMode','vtPvDoc','vtSchemaRif',
+ 'vtPvMppt','vtPvDcProtectionDetail','vtPvAcProtectionDetail','vtPvBatteryProtectionDetail'];
 const escXml=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const cut=(v,n=50)=>{const s=String(v??'').trim();return s.length>n?s.slice(0,n-1)+'…':s||'Da specificare';};
 const number=v=>Number(String(v??'').trim().replace(',','.'));
@@ -59,7 +60,11 @@ function issues(){
  required('Punto di connessione AC / rete','vtPvRete');
  required('Terra ed equipotenzialità','vtPvTerra');
  required('Protezione di interfaccia (indicare se integrata)','vtPvInterfaccia');
+ required('Assegnazione delle stringhe agli ingressi MPPT','vtPvMppt');
+ required('Caratteristiche delle protezioni/sezionatori del quadro DC','vtPvDcProtectionDetail');
+ required('Caratteristiche delle protezioni del quadro AC','vtPvAcProtectionDetail');
  if(hasStorage()){
+  required('Protezioni e cablaggio del sistema di accumulo','vtPvBatteryProtectionDetail');
   required('Batterie: modello','vtPvAccumulo');
   required('Batterie: capacità','vtPvAccumuloKwh');
  }
@@ -130,8 +135,9 @@ function svg(){
  textAt(36,108,checked?'REVISIONE TECNICA CONFERMATA · '+(state.vtPvSchemaValidatedOn||''):'GENERATO DAI DATI · DA VERIFICARE',15,checked?'#0f6842':'#ac4b06','bold');
  // DC string runs are represented separately; never create an unverified parallel connection.
  h+=link(250,306,250,337,'#b5222d')+link(250,337,388,337,'#b5222d')+link(388,337,388,365,'#b5222d');
- h+=link(750,306,750,337,'#b5222d')+link(750,337,612,337,'#b5222d')+link(612,337,612,365,'#b5222d');
- h+=link(388,492,388,536,'#b5222d')+link(612,492,612,536,'#b5222d');
+ if(sd.count>=2)h+=link(750,306,750,337,'#b5222d')+link(750,337,612,337,'#b5222d')+link(612,337,612,365,'#b5222d');
+ h+=link(388,492,388,536,'#b5222d');
+ if(sd.count>=2)h+=link(612,492,612,536,'#b5222d');
  h+=link(500,676,500,755,'#18548b');
  h+=link(500,871,500,945,'#18548b');
  if(hasStorage()){
@@ -155,23 +161,23 @@ function svg(){
  ],'#a9222a','#fcecef');
  h+=box(290,365,420,127,'QUADRO DC / SEZIONAMENTO',[
    dcProduct?'Apparato: '+dcProduct:'Apparato: da identificare',
-   state.vtPvDc||'Protezioni DC: da indicare',
-   'Rami DC1 e DC2 rappresentati distinti'
+   state.vtPvDcProtectionDetail||state.vtPvDc||'Protezioni DC: da indicare',
+   'Percorsi DC distinti · MPPT da verificare'
  ],'#a9222a','#fcecef');
  h+=box(285,536,430,140,'INVERTER / CONVERSIONE DC-AC',[
    state.vtPvInverter||'Marca / modello da indicare',
    'Potenza AC nominale: '+invPower+' kW',
-   inverterProduct?'Dispositivo: '+inverterProduct:'Dati dispositivo nella relazione materiali',
+   state.vtPvMppt?'Ingressi: '+state.vtPvMppt:'Ingressi MPPT da indicare',
    dcLine[0]
  ],'#254b77','#edf3ff');
  if(hasStorage())h+=box(750,552,223,113,'ACCUMULO',[
    state.vtPvAccumulo||batProduct||'Batterie da definire',
    'Capacità: '+(state.vtPvAccumuloKwh||'—')+' kWh',
-   'Connessione: da verificare'
+   state.vtPvBatteryProtectionDetail||'Protezioni: da indicare'
  ],'#7652a0','#f4effa');
  h+=box(285,755,430,116,'QUADRO AC / PROTEZIONI',[
    acProduct?'Apparato: '+acProduct:'Apparato: da identificare',
-   state.vtPvAc||'Protezioni AC: da indicare',
+   state.vtPvAcProtectionDetail||state.vtPvAc||'Protezioni AC: da indicare',
    acLine[0]
  ],'#235b86','#eaf4ff');
  h+=box(285,945,430,106,'PUNTO DI CONNESSIONE / RETE',[
@@ -192,6 +198,10 @@ function svg(){
  h+='</svg>';
  return h;
 }
+function detailInput(label,key){
+ return '<label>'+escXml(label)+'<input type="text" value="'+escXml(state[key]||'')+
+ '" onchange="vtPvUnifilar.edit(&quot;'+key+'&quot;,this.value)" placeholder="Riportare dati reali, non ipotesi"></label>';
+}
 const oldUnifilar=unifilar;
 unifilar=function(){
  if(!fvActive())return oldUnifilar();
@@ -206,9 +216,16 @@ unifilar=function(){
  return '<div class="card"><h2>Schema unifilare fotovoltaico automatico</h2>'+
  '<p class="muted">Elaborato A4 generato da moduli, stringhe, inverter, accumulo e collegamenti già registrati. I due ingressi DC restano distinti finché non viene verificata la topologia reale. Non rappresenta caratteristiche di protezione non dichiarate.</p>'+
  '<p><b>Stato:</b> '+(checked?'Verificato dal responsabile tecnico':'Da verificare')+'. '+note+'</p>'+
+ '<h3>Dati di protezione e collegamento da riportare nel disegno</h3><div class="grid">'+
+ detailInput('Stringhe → ingressi MPPT effettivi','vtPvMppt')+
+ detailInput('Sezionatori, SPD e altre protezioni DC: tipo e valori','vtPvDcProtectionDetail')+
+ detailInput('Protezione AC: MT/MTD, differenziale, SPD: tipo e valori','vtPvAcProtectionDetail')+
+ (hasStorage()?detailInput('Protezione e cablaggio dell’accumulo','vtPvBatteryProtectionDetail'):'')+
+ '</div>'+
  '<div class="vt-pv-schema-preview" style="max-width:860px;margin:16px auto;border:1px solid #c7d0d9;border-radius:8px;overflow:hidden">'+svg()+'</div>'+
  (missing.length?'<h3>Da completare prima della validazione tecnica</h3><ul>'+missing.map(x=>'<li>'+escXml(x)+'</li>').join('')+'</ul>':'<p>Tutti i dati minimi per richiedere la revisione risultano compilati. La correttezza elettrica resta da controllare.</p>')+
  '<div class="actions"><button type="button" onclick="vtPvUnifilar.print()">Stampa solo schema / PDF</button>'+
+ '<button type="button" class="secondary" onclick="vtPvUnifilar.download()">Scarica schema SVG</button>'+
  '<button type="button" class="secondary" onclick="vtPvUnifilar.validate()">Conferma verifica del responsabile tecnico</button>'+
  '<button type="button" class="secondary" onclick="vtPvUnifilar.reset()">Revoca verifica</button></div>'+
  '<p class="muted">Per correggere la configurazione torna su <b>Impianto</b>, <b>Frutti e materiali</b> e <b>Quadri e circuiti</b>. Dopo ogni modifica lo schema viene rigenerato e la revisione precedente non vale più.</p></div>'+
@@ -237,6 +254,21 @@ vtDicoDatiMancanti=function(){
 };
 window.vtPvUnifilar={
  print(){printDocuments(['unifilar']);},
+ edit(key,value){
+  if(!fvActive()||!FIELDS.includes(key))return;
+  state[key]=String(value);
+  save(false);render();
+ },
+ download(){
+  if(!fvActive())return;
+  const blob=new Blob([svg()],{type:'image/svg+xml;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;
+  a.download='Schema_Unifilare_FV_'+(state.practiceNo||'pratica')+'.svg';
+  document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),15000);
+ },
  validate(){
   if(!fvActive())return;
   const missing=issues();
