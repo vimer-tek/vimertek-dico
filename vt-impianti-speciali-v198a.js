@@ -86,6 +86,7 @@
       ${vtField('vtPvTerra','Terra ed equipotenzialità','Conduttori PE, masse, strutture metalliche, misure pertinenti.')}
       ${vtField('vtPvRete','Punto connessione e sistema elettrico','Monofase/trifase, tensione, punto di consegna o isola.')}
       ${vtField('vtPvDoc','Progetto, schema unifilare, documenti di connessione','Elencare gli allegati pertinenti e riferimenti ai file caricati.')}
+      ${vtField('vtSchemaRif','Riferimento schema unifilare as-built da allegare','Indicare il titolo/codice del disegno realmente verificato e caricarlo negli Allegati originali.')}
     </div><p><strong>Potenza nominale campo FV:</strong> <span id="vt-pv-kwp">${esc(vtPvKwp()||"Da calcolare")}</span> kWp (numero moduli × Wp / 1000).</p>
     <p class="muted">Occorrono la verifica delle condizioni di applicabilità del D.M. 37/08, il progetto e gli schemi dove previsti, le verifiche effettive e la documentazione di rete se applicabile.</p></div>`;
   }
@@ -158,6 +159,82 @@
   PRINT_SECTIONS.splice(3,0,['vt-specialist','Relazione tecnica impianto speciale']);
   const oldAvailable=availablePrintSections;
   availablePrintSections=function(){return oldAvailable().filter(([id])=>id!=='vt-specialist'||vtEnabled()).filter(([id])=>!vtEnabled()||id!=='circuits'||vtArray('vtLinks').some(x=>!x.category||x.category===vtType())).map(([id,name])=>vtEnabled()&&id==='unifilar'?[id,vtPV()?'Collegamenti FV / schema da allegare':'Schema funzionale / collegamenti']:vtEnabled()&&id==='materials'?[id,vtPV()?'Moduli, inverter, batterie e materiali':'Elenco apparati e materiali']:vtEnabled()&&id==='verification'?[id,vtPV()?'Verifiche e messa in servizio FV':'Collaudo e verifiche funzionali']:[id,name]);};
+  // VT_FV_VALIDATION_20261117: controlli delle Di.Co. FV separati da frutti e 17 verifiche elettriche ordinarie.
+  const oldDicoDataValidation=vtDicoDatiMancanti;
+  function fvDateISO(raw){
+    const value=String(raw||'').trim();
+    let y,m,d;
+    let match=value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if(match){y=+match[1];m=+match[2];d=+match[3];}
+    else{match=value.match(/^(\d{2})[\/.](\d{2})[\/.](\d{4})$/);if(!match)return '';d=+match[1];m=+match[2];y=+match[3];}
+    const date=new Date(Date.UTC(y,m-1,d));
+    if(date.getUTCFullYear()!==y||date.getUTCMonth()!==m-1||date.getUTCDate()!==d)return '';
+    return String(y).padStart(4,'0')+'-'+String(m).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+  }
+  vtDicoDatiMancanti=function(){
+    if(!vtEnabled()||!vtPV())return oldDicoDataValidation();
+    const m=state.vtV1910?.ministerial||{}, missing=[];
+    const req=(label,value)=>{if(!String(value??'').trim())missing.push(label);};
+    if(state.declarationRole!=='Impresa installatrice')missing.push('Ruolo dichiarante: impresa installatrice');
+    req('Impresa installatrice',state.company);
+    req('Legale rappresentante / firmatario',m.representative||state.issuerTechnician||state.technician);
+    req('Responsabile tecnico',state.technician);
+    req('Committente',state.client);
+    req('CF o P.IVA committente',state.clientTax);
+    req('Ubicazione',state.address);
+    req('Comune e provincia',state.city&&state.province);
+    req('Descrizione lavori',state.workDescription);
+    req('Sede legale impresa',state.companyAddress||m.headOffice);
+    req('Telefono impresa',state.companyPhone);
+    req('Partita IVA impresa',state.companyVat);
+    req('Settore abilitazione impresa',state.companySector||m.sector);
+    const camera=String(state.registryOffice||m.regOffice||'').trim();
+    const reg=String(state.registryNumber||m.regNo||'').trim();
+    req('Camera di commercio',camera);
+    req('Numero Registro imprese / REA',reg);
+    if(camera&&reg&&(camera.replace(/\s/g,'').toUpperCase()===reg.replace(/\s/g,'').toUpperCase()||/^(?:[A-Z]{2}\s*[-–]\s*)?\d{4,}$/i.test(camera)))missing.push('CCIAA: indicare il nome della Camera, non il numero REA');
+    req('Norme tecniche effettivamente applicate',state.vtNormaRiferimento||state.technicalStandard||m.technicalStandard);
+    req('Progettista / redattore elaborato',state.projectAuthor||m.projectAuthor||(state.designers||[])[0]?.name);
+    if(state.vtAbilitazione!=='Verificata sulla visura')missing.push('Abilitazione lettera A da verificare sulla visura');
+    req('Numero di moduli FV',state.vtPvNmoduli);
+    req('Potenza nominale moduli (Wp)',state.vtPvWpModulo);
+    req('Configurazione stringhe',state.vtPvStringhe);
+    req('Inverter: marca e modello',state.vtPvInverter);
+    req('Protezione e cavi DC',state.vtPvDc);
+    req('Protezione e cavi AC',state.vtPvAc);
+    req('Collegamento alla rete e sistema elettrico',state.vtPvRete);
+    req('Terra ed equipotenzialità',state.vtPvTerra);
+    if(vtPvMode().includes('con accumulo'))req('Tipo e capacità accumulo',state.vtPvAccumulo&&state.vtPvAccumuloKwh);
+    if(vtPvMode().includes('Connesso alla rete'))req('Dispositivo / protezione di interfaccia rete (se integrato, specificarlo)',state.vtPvInterfaccia);
+    const devices=vtArray('vtDevices').filter(d=>!d.category||d.category===vtType());
+    if(!devices.some(d=>Number(d.qty)>0))missing.push('Moduli, inverter e materiali registrati nella sezione FV');
+    const links=vtArray('vtLinks').filter(l=>!l.category||l.category===vtType());
+    if(!links.length)missing.push('Collegamenti FV nella sezione Quadri e circuiti');
+    req('Riferimento allo schema unifilare FV as-built',state.vtSchemaRif);
+    req('Data del collaudo fotovoltaico',state.vtDataVerifiche);
+    const instruments=state.vtPro?.instruments||[];
+    if(!String(state.vtStrumenti||'').trim()&&!instruments.some(x=>String(x.name||'').trim()))missing.push('Strumenti di misura utilizzati sul fotovoltaico');
+    const outcomes=vtChecks();
+    const bad=vtCfg().checks.filter((_,i)=>!['Conforme','Non applicabile'].includes(outcomes[i]?.outcome));
+    if(bad.length)missing.push('Verifiche FV: '+bad.length+' da completare o con esito non conforme');
+    const noReason=vtCfg().checks.filter((_,i)=>outcomes[i]?.outcome==='Non applicabile'&&!String(outcomes[i]?.note||'').trim());
+    if(noReason.length)missing.push('Motivare le verifiche FV marcate Non applicabile: '+noReason.length);
+    for(const [key,label] of [
+      ['dicoProjectVerified','Progetto e schema verificati'],
+      ['dicoMaterialsVerified','Relazione materiali verificata'],
+      ['dicoTestsVerified','Verifiche strumentali concluse'],
+      ['dicoCertVerified','Certificato requisiti tecnico-professionali allegato']
+    ])if(state[key]!=='Si')missing.push(label);
+    if(!attachmentMeta().length)missing.push('Allegati originali mancanti: caricare schema FV, documenti dell’impresa e prove pertinenti');
+    const declared=String(state.dicoDate||'').trim(),date=fvDateISO(declared),tested=fvDateISO(state.vtDataVerifiche);
+    if(!date)missing.push('Data Di.Co. mancante o non valida (gg/mm/aaaa)');
+    if(String(state.dicoPlace||'').trim()==='')missing.push('Luogo dichiarazione');
+    if(declared&&tested&&date&&date<tested)missing.push('La data della Di.Co. precede il collaudo FV ('+state.vtDataVerifiche+')');
+    const measurements=Array.isArray(state.vtPro?.measurements)?state.vtPro.measurements:[];
+    const later=measurements.find(x=>{const d=fvDateISO(x.date);return d&&date&&d>date;});
+    if(later)missing.push('La data della Di.Co. precede una misura registrata ('+later.date+')');
+    return [...new Set(missing)];
+  };
   const oldFascicolo=fascicolo;
   fascicolo=function(){
     let h=oldFascicolo();
@@ -165,7 +242,13 @@
       return h.replace(/<label class=['"]print-option['"]><input[^>]+data-print-section=['"]vt-specialist['"][^>]*>[^<]*<\/label>/g,'');
     }
     h=h.replace('FASCICOLO TECNICO IMPIANTO ELETTRICO',vtPV()?'FASCICOLO TECNICO IMPIANTO FOTOVOLTAICO':'FASCICOLO TECNICO IMPIANTO ELETTRONICO');
-    return h.replace('Relazione tecnica impianto speciale',vtPV()?'Relazione tecnica fotovoltaico':'Relazione tecnica impianto elettronico');
+    h=h.replace('Relazione tecnica impianto speciale',vtPV()?'Relazione tecnica fotovoltaico':'Relazione tecnica impianto elettronico');
+    if(vtPV()){
+      const missing=vtDicoDatiMancanti();
+      const h3=missing.length?'<h3>Prima del rilascio della Di.Co. fotovoltaica</h3><p class="muted">La stampa dell’Allegato I resta bloccata finché questi controlli non sono completati. Gli altri documenti possono essere stampati singolarmente.</p><ul>'+missing.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul>':'<h3>Controlli documentali FV compilati</h3><p>Non risultano campi bloccanti nella lista automatica. Verifica comunque misure, progetto, schemi e allegati originali prima di firmare.</p>';
+      return '<section class="card">'+h3+'</section>'+h;
+    }
+    return h;
   };
   printFascicolo=function(){
     const ids=availablePrintSections().map(([id])=>id);
