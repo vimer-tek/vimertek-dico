@@ -4,6 +4,7 @@ import { dirname, join } from 'node:path';
 const files = [
   "app.js",
   "vt-impianti-speciali-v198a.js",
+  "vt-fv-unifilare-v1912.js",
   "vt-centro-operativo-v199.js",
   "vt-completamento-v1910.js",
   "firma-vimertek-solo-grafica.js",
