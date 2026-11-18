@@ -40,7 +40,8 @@ function fingerprint(){
  return JSON.stringify({
   tipo:state.installationType,doc:state.doc,
   fields:FIELDS.map(k=>String(state[k]??'')),
-  connections:lines(),components:devices(),boardDetails:state.vtPvBoardData||null
+  connections:lines(),components:devices(),boardDetails:state.vtPvBoardData||null,
+  protectionDevices:(state.vtQuadroDevices||[]).filter(x=>x.category==='FV')
  });
 }
 function isReviewed(){
