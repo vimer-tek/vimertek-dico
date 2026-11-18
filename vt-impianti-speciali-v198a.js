@@ -209,7 +209,7 @@
     const devices=vtArray('vtDevices').filter(d=>!d.category||d.category===vtType());
     if(!devices.some(d=>Number(d.qty)>0))missing.push('Moduli, inverter e materiali registrati nella sezione FV');
     const links=vtArray('vtLinks').filter(l=>!l.category||l.category===vtType());
-    if(!links.length)missing.push('Collegamenti FV nella sezione Quadri e circuiti');
+    if(!links.length&&!Object.values(state.vtPvBoardData?.routes||{}).some(r=>r?.status==='si'))missing.push('Collegamenti FV nella sezione Quadri e circuiti');
     req('Riferimento allo schema unifilare FV as-built',state.vtSchemaRif);
     req('Data del collaudo fotovoltaico',state.vtDataVerifiche);
     const instruments=state.vtPro?.instruments||[];
