@@ -60,11 +60,15 @@ function issues(){
  required('Punto di connessione AC / rete','vtPvRete');
  required('Terra ed equipotenzialità','vtPvTerra');
  required('Protezione di interfaccia (indicare se integrata)','vtPvInterfaccia');
- required('Assegnazione delle stringhe agli ingressi MPPT','vtPvMppt');
- required('Caratteristiche delle protezioni/sezionatori del quadro DC','vtPvDcProtectionDetail');
- required('Caratteristiche delle protezioni del quadro AC','vtPvAcProtectionDetail');
+ if(!String(state.vtPvMppt||'').trim()&&!String(state.vtPvBoardData?.sections?.ST1?.mppt||'').trim())
+  missing.push('Assegnazione delle stringhe agli ingressi MPPT');
+ if(!String(state.vtPvDcProtectionDetail||'').trim()&&!String(state.vtPvBoardData?.sections?.QDC?.sez||'').trim())
+  missing.push('Caratteristiche delle protezioni/sezionatori del quadro DC');
+ if(!String(state.vtPvAcProtectionDetail||'').trim()&&!String(state.vtPvBoardData?.sections?.QAC?.mt||'').trim())
+  missing.push('Caratteristiche delle protezioni del quadro AC');
  if(hasStorage()){
-  required('Protezioni e cablaggio del sistema di accumulo','vtPvBatteryProtectionDetail');
+  if(!String(state.vtPvBatteryProtectionDetail||'').trim()&&!String(state.vtPvBoardData?.sections?.BAT?.sez||'').trim())
+   missing.push('Protezioni e cablaggio del sistema di accumulo');
   required('Batterie: modello','vtPvAccumulo');
   required('Batterie: capacità','vtPvAccumuloKwh');
  }
@@ -136,13 +140,13 @@ function svg(){
  const bp=id=>!!window.vtPvBoards?.present?.(id);
  const bg=(id,key)=>window.vtPvBoards?.get?.(id,key)||'';
  const bl=id=>window.vtPvBoards?.routeLabel?.(id)||'';
- const hasS1=bp('st1dc')||lines().some(l=>(strName(l.from,1)&&dc(l.to))||(dc(l.from)&&strName(l.to,1)));
- const hasS2=bp('st2dc')||lines().some(l=>(strName(l.from,2)&&dc(l.to))||(dc(l.from)&&strName(l.to,2)));
- const hasDC1toINV=bp('dc1inv')||lines().some(l=>(dc(l.from)&&inverter(l.to)||inverter(l.from)&&dc(l.to))&&!/ST2/.test(name(l.from)+name(l.to)));
- const hasDC2toINV=bp('dc2inv')||lines().some(l=>(dc(l.from)&&inverter(l.to)||inverter(l.from)&&dc(l.to))&&/ST2/.test(name(l.from)+name(l.to)));
- const hasINVtoAC=bp('invac')||hasConnection(inverter,ac);
- const hasACtoGrid=bp('acgrid')||hasConnection(ac,network);
- const hasStorageLink=bp('batinv')||hasConnection(inverter,battery);
+ const hasS1=window.vtPvBoards?bp('st1dc'):lines().some(l=>(strName(l.from,1)&&dc(l.to))||(dc(l.from)&&strName(l.to,1)));
+ const hasS2=window.vtPvBoards?bp('st2dc'):lines().some(l=>(strName(l.from,2)&&dc(l.to))||(dc(l.from)&&strName(l.to,2)));
+ const hasDC1toINV=window.vtPvBoards?bp('dc1inv'):hasConnection(dc,inverter);
+ const hasDC2toINV=window.vtPvBoards?bp('dc2inv'):hasConnection(dc,inverter);
+ const hasINVtoAC=window.vtPvBoards?bp('invac'):hasConnection(inverter,ac);
+ const hasACtoGrid=window.vtPvBoards?bp('acgrid'):hasConnection(ac,network);
+ const hasStorageLink=window.vtPvBoards?bp('batinv'):hasConnection(inverter,battery);
  let h='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1195" width="100%" role="img" aria-label="Schema unifilare fotovoltaico automatico" style="display:block;width:100%;height:auto;background:white">'+
  '<rect x="2" y="2" width="996" height="1191" fill="white" stroke="#1b3045" stroke-width="3"/>'+
  '<rect x="12" y="12" width="976" height="112" fill="#f5f8fb"/>'+
