@@ -104,6 +104,9 @@ const textAt=(x,y,value,size=15,color='#17283c',weight='normal',anchor='start')=
 const link=(x1,y1,x2,y2,color='#344358',dash='')=>
  '<path d="M'+x1+' '+y1+' L'+x2+' '+y2+'" fill="none" stroke="'+color+
  '" stroke-width="3"'+(dash?' stroke-dasharray="'+dash+'"':'')+'/>';
+// Un collegamento non documentato non si rappresenta come conduttore confermato.
+const wire=(x1,y1,x2,y2,color,documented)=>
+ link(x1,y1,x2,y2,documented?color:'#969da6',documented?'':'9 7');
 function box(x,y,w,h,heading,rows,border='#34485d',color='#f3f7fb'){
  let out='<rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" rx="9" fill="white" stroke="'+border+'" stroke-width="2"/>'+
  '<rect x="'+x+'" y="'+y+'" width="'+w+'" height="37" rx="9" fill="'+color+'"/>'+
@@ -127,6 +130,12 @@ function svg(){
  const dcLine=describeLink(l=>dc(l.from)&&inverter(l.to)||inverter(l.from)&&dc(l.to));
  const acLine=describeLink(l=>ac(l.from)&&network(l.to)||network(l.from)&&ac(l.to));
  const checked=isReviewed();
+ const hasS1=lines().some(l=>(strName(l.from,1)&&dc(l.to))||(dc(l.from)&&strName(l.to,1)));
+ const hasS2=lines().some(l=>(strName(l.from,2)&&dc(l.to))||(dc(l.from)&&strName(l.to,2)));
+ const hasDCtoINV=hasConnection(dc,inverter);
+ const hasINVtoAC=hasConnection(inverter,ac);
+ const hasACtoGrid=hasConnection(ac,network);
+ const hasStorageLink=hasConnection(inverter,battery);
  let h='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1195" width="100%" role="img" aria-label="Schema unifilare fotovoltaico automatico" style="display:block;width:100%;height:auto;background:white">'+
  '<rect x="2" y="2" width="996" height="1191" fill="white" stroke="#1b3045" stroke-width="3"/>'+
  '<rect x="12" y="12" width="976" height="112" fill="#f5f8fb"/>'+
@@ -134,15 +143,15 @@ function svg(){
  textAt(36,83,'Pratica: '+(state.practiceNo||'—')+'   |   Campo FV: '+kWp+' kWp   |   Inverter: '+invPower+' kW',16)+
  textAt(36,108,checked?'REVISIONE TECNICA CONFERMATA · '+(state.vtPvSchemaValidatedOn||''):'GENERATO DAI DATI · DA VERIFICARE',15,checked?'#0f6842':'#ac4b06','bold');
  // DC string runs are represented separately; never create an unverified parallel connection.
- h+=link(250,306,250,337,'#b5222d')+link(250,337,388,337,'#b5222d')+link(388,337,388,365,'#b5222d');
- if(sd.count>=2)h+=link(750,306,750,337,'#b5222d')+link(750,337,612,337,'#b5222d')+link(612,337,612,365,'#b5222d');
- h+=link(388,492,388,536,'#b5222d');
- if(sd.count>=2)h+=link(612,492,612,536,'#b5222d');
- h+=link(500,676,500,755,'#18548b');
- h+=link(500,871,500,945,'#18548b');
+ h+=wire(250,306,250,337,'#b5222d',hasS1)+wire(250,337,388,337,'#b5222d',hasS1)+wire(388,337,388,365,'#b5222d',hasS1);
+ if(sd.count>=2)h+=wire(750,306,750,337,'#b5222d',hasS2)+wire(750,337,612,337,'#b5222d',hasS2)+wire(612,337,612,365,'#b5222d',hasS2);
+ h+=wire(388,492,388,536,'#b5222d',hasDCtoINV);
+ if(sd.count>=2)h+=wire(612,492,612,536,'#b5222d',hasDCtoINV);
+ h+=wire(500,676,500,755,'#18548b',hasINVtoAC);
+ h+=wire(500,871,500,945,'#18548b',hasACtoGrid);
  if(hasStorage()){
-  h+=link(714,608,750,608,'#8b5fa8')+
-   '<path d="M719 600 L711 608 L719 616 M744 600 L752 608 L744 616" fill="none" stroke="#8b5fa8" stroke-width="2.6"/>';
+  h+=wire(714,608,750,608,'#8b5fa8',hasStorageLink);
+  if(hasStorageLink)h+='<path d="M719 600 L711 608 L719 616 M744 600 L752 608 L744 616" fill="none" stroke="#8b5fa8" stroke-width="2.6"/>';
  }
  // PE/equipotential connections are schematic and must be checked on site.
  h+=link(172,425,172,821,'#378065','9 7')+
@@ -189,7 +198,8 @@ function svg(){
    'Collegamenti da verificare',
    state.vtPvTerra||'Dati terra da inserire'
  ],'#397a60','#effaf3');
- h+=textAt(40,1101,'DC: rosso   •   AC: blu   •   Accumulo: viola   •   PE: verde tratteggiato',14,'#34475c');
+ h+=textAt(40,1093,'DC: rosso   •   AC: blu   •   Accumulo: viola   •   PE: verde tratteggiato',14,'#34475c');
+ h+=textAt(40,1112,'Grigio tratteggiato = collegamento NON registrato nella pratica',13,'#686e77');
  h+=textAt(40,1127,'Rif.: '+(state.vtSchemaRif||('FV-'+(state.practiceNo||'da numerare'))),14);
  h+=textAt(40,1155,'Collegamenti e dispositivi da confrontare con l’impianto effettivamente realizzato.',13,'#5b6877');
  h+=textAt(600,1127,'DIRETTORE TECNICO',14,'#25374b','bold');
@@ -214,7 +224,7 @@ unifilar=function(){
  t.map(x=>'<tr><td>'+escXml(x.from)+'</td><td>'+escXml(x.to)+'</td><td>'+escXml(x.cable)+'</td><td>'+escXml(x.note)+'</td></tr>').join('')+
  '</tbody></table>':'<p>Nessun collegamento registrato.</p>';
  return '<div class="card"><h2>Schema unifilare fotovoltaico automatico</h2>'+
- '<p class="muted">Elaborato A4 generato da moduli, stringhe, inverter, accumulo e collegamenti già registrati. I due ingressi DC restano distinti finché non viene verificata la topologia reale. Non rappresenta caratteristiche di protezione non dichiarate.</p>'+
+ '<p class="muted">Elaborato A4 generato da moduli, stringhe, inverter, accumulo e collegamenti già registrati. Le linee grigie tratteggiate indicano collegamenti non registrati, non confermati. I due ingressi DC restano distinti finché non viene verificata la topologia reale.</p>'+
  '<p><b>Stato:</b> '+(checked?'Verificato dal responsabile tecnico':'Da verificare')+'. '+note+'</p>'+
  '<h3>Dati di protezione e collegamento da riportare nel disegno</h3><div class="grid">'+
  detailInput('Stringhe → ingressi MPPT effettivi','vtPvMppt')+
