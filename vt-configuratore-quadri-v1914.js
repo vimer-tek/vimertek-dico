@@ -140,7 +140,7 @@ function diagram(){
     '<circle cx="'+cx+'" cy="'+y+'" r="5" fill="#19848b"/>'+
     '<rect x="315" y="'+(y-26)+'" width="76" height="52" fill="white" stroke="#19848b" stroke-width="2.5"/>'+
     svgText(327,y+6,d.type==='spd'?'SPD':d.type==='fus'?'F':'DER',17,true);
-    if(d.type==='spd')s+='<path d="M353 '+(y+27)+' v15 m-12 0 h24 m-19 5 h14 m-9 5 h4" stroke="#16856b" stroke-width="2" fill="none"/>';
+    if(d.type==='spd')s+='<path d="M353 '+(y+27)+' v15 m-12 0 h24 m-19 5 h14 m-9 5 h4" stroke="'+(d.installation&&d.verified?'#16856b':'#949da8')+'"'+(d.installation&&d.verified?'':' stroke-dasharray="6 4"')+' stroke-width="2" fill="none"/>';
    }else{
     s+='<rect x="306" y="'+(y-25)+'" width="85" height="50" fill="#fafafa" stroke="#949da8" stroke-width="2" stroke-dasharray="7 5"/>'+
     svgText(314,y+4,p==='censimento'?'ELENCO':'NON DEF.',12);
@@ -158,7 +158,11 @@ function table(){
  return '<section class="print-section"><h2>Dispositivi e protezioni registrati nei quadri</h2><p>Le caratteristiche sono dichiarate dall’installatore e devono corrispondere alle targhette ed al progetto applicabile.</p><table><thead><tr><th>Quadro / ramo</th><th>Sigla</th><th>Tipo</th><th>Marca / modello</th><th>Caratteristiche</th><th>Posizione</th></tr></thead><tbody>'+rows+'</tbody></table></section>';
 }
 const oldCircuits=circuits;
-circuits=function(){return oldCircuits()+(enabled()?form():'');};
+circuits=function(){
+ const existing=oldCircuits();
+ if(!enabled())return existing;
+ return fv()?form()+existing:existing+form();
+};
 const oldUnifilar=unifilar;
 unifilar=function(){return oldUnifilar()+(enabled()&&current().length?'<div class="card"><h2>Schema dispositivi e protezioni per ramo</h2><p class="muted">I simboli sono collocati solo nella posizione scelta, senza creare collegamenti fra rami non documentati.</p>'+diagram()+'</div>':'');};
 const oldPrintPart=printPart;
