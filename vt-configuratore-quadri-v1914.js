@@ -3,7 +3,7 @@
 (function(){
 'use strict';
 const fv=()=>state.doc==='Di.Co.'&&state.installationType==='Fotovoltaico';
-const enabled=()=>fv()||!state.installationType||state.installationType==='Impianto elettrico';
+const enabled=()=>fv()||(state.doc==='Di.Co.'&&(!state.installationType||state.installationType==='Impianto elettrico'));
 const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const cut=(x,n=65)=>{const s=String(x??'');return s.length>n?s.slice(0,n-1)+'…':s;};
 const types=[['mt','Magnetotermico'],['mtd','Magnetotermico differenziale'],['rcd','Differenziale'],['spd','Scaricatore SPD'],['sez','Sezionatore'],['fus','Fusibile'],['cont','Contattore'],['other','Altro apparecchio']];
@@ -53,7 +53,7 @@ const opt=(k,label,value)=>'<option value="'+esc(k)+'"'+(k===value?' selected':'
 const sel=(k,label,vals,value)=>'<label>'+esc(label)+'<select data-vtdev="'+k+'">'+vals.map(x=>opt(x[0],x[1],value)).join('')+'</select></label>';
 const inp=(k,label,placeholder,value)=>'<label>'+esc(label)+'<input data-vtdev="'+k+'" placeholder="'+esc(placeholder)+'" value="'+esc(value)+'"></label>';
 const btn=(label,action,id='',style='secondary')=>'<button type="button" class="'+style+'" data-vtdevice-action="'+action+'" data-id="'+esc(id)+'">'+esc(label)+'</button>';
-const description=d=>[d.tag,[d.brand,d.model].filter(Boolean).join(' '),d.poles?d.poles:'',d.rated?d.rated+' A':'',d.curve?'curva '+d.curve:'',d.breaking?d.breaking+' kA':'',d.delta?'IΔn '+d.delta+' mA':'',d.rcdType?'tipo '+d.rcdType:'',d.spdClass?'SPD '+d.spdClass:'',d.uc?'Uc/Ucpv '+d.uc+' V':'',d.up?'Up '+d.up+' kV':'',d.fuseType?'fusibile '+d.fuseType:'',d.voltage?d.voltage+' V':''].filter(Boolean).join(' · ');
+const description=d=>[d.tag,[d.brand,d.model].filter(Boolean).join(' '),Number(d.qty)>1?'Quantità '+d.qty:'',d.poles?d.poles:'',d.rated?d.rated+' A':'',d.curve?'curva '+d.curve:'',d.breaking?d.breaking+' kA':'',d.delta?'IΔn '+d.delta+' mA':'',d.rcdType?'tipo '+d.rcdType:'',d.spdClass?'SPD '+d.spdClass:'',d.uc?'Uc/Ucpv '+d.uc+' V':'',d.up?'Up '+d.up+' kV':'',d.fuseType?'fusibile '+d.fuseType:'',d.voltage?d.voltage+' V':''].filter(Boolean).join(' · ');
 function issues(){
  if(!enabled())return [];
  let results=[];
@@ -119,12 +119,14 @@ function diagram(){
   if(!g){g={board:d.board,branch:d.branch,items:[]};groups.push(g);}
   g.items.push(d);
  }
- return groups.map(g=>{
+ const pages=[];
+ for(const g of groups)for(let i=0;i<g.items.length;i+=5)pages.push({...g,items:g.items.slice(i,i+5),page:1+Math.floor(i/5),pages:Math.ceil(g.items.length/5)});
+ return pages.map(g=>{
   const h=Math.max(300,170+g.items.length*120),cx=185;
   let s='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 940 '+h+'" width="100%" role="img" aria-label="Schema unifilare '+esc(boardLabel(g.board))+' '+esc(branchLabel(g.board,g.branch))+'" style="display:block;width:100%;height:auto">'+
   '<rect x="2" y="2" width="936" height="'+(h-4)+'" fill="white" stroke="#405466" stroke-width="2"/>'+
   '<rect x="15" y="15" width="910" height="44" fill="#edf2f7"/>'+
-  svgText(28,44,boardLabel(g.board)+' · '+branchLabel(g.board,g.branch),23,true)+
+  svgText(28,44,boardLabel(g.board)+' · '+branchLabel(g.board,g.branch)+(g.pages>1?' · '+g.page+'/'+g.pages:''),23,true)+
   svgText(95,83,'Ingresso del ramo · verificare origine',13)+
   '<path d="M'+cx+' 96 V'+(h-60)+'" stroke="#264f75" stroke-width="3" fill="none"/>';
   g.items.forEach((d,i)=>{
@@ -169,8 +171,14 @@ if(window.vtPvBoards){
  const oldIssues=window.vtPvBoards.issues;
  window.vtPvBoards.issues=function(){
   const r=oldIssues();if(!fv())return r;
-  for(const [key,label] of [['QDC','quadro DC'],['QAC','quadro AC']])
-   if(!current().some(d=>d.board===key))r.push('Aggiungere dispositivi nel '+label);
+  for(const [key,label] of [['QDC','quadro DC'],['QAC','quadro AC']]){
+   const text=(key==='QDC'?state.vtPvDc:state.vtPvAc)||'';
+   const materials=Array.isArray(state.vtDevices)?state.vtDevices:[];
+   const relevant=String(text).toUpperCase().includes(key==='QDC'?'QUADRO DC':'QUADRO AC')||
+      materials.some(x=>String(x.type||'').toUpperCase().includes(key==='QDC'?'QUADRO DC':'QUADRO AC'))||
+      Object.values(state.vtPvBoardData?.sections?.[key]||{}).some(x=>String(x||'').trim());
+   if(relevant&&!current().some(d=>d.board===key))r.push('Aggiungere dispositivi nel '+label);
+  }
   r.push(...issues());return [...new Set(r)];
  };
 }
