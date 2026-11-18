@@ -40,7 +40,7 @@ function fingerprint(){
  return JSON.stringify({
   tipo:state.installationType,doc:state.doc,
   fields:FIELDS.map(k=>String(state[k]??'')),
-  connections:lines(),components:devices()
+  connections:lines(),components:devices(),boardDetails:state.vtPvBoardData||null
  });
 }
 function isReviewed(){
@@ -76,16 +76,19 @@ function issues(){
  if(sd.count>2)missing.push('Più di 2 stringhe: dettagliare la topologia con un elaborato specialistico');
  if(!devices().some(x=>/modulo fotovoltaico/i.test(x.type||'')))missing.push('Moduli FV non registrati nei materiali');
  if(!devices().some(x=>/inverter/i.test(x.type||'')))missing.push('Inverter non registrato nei materiali');
- if(!lines().length)missing.push('Collegamenti FV non registrati');
+ const boardPresent=id=>!!window.vtPvBoards?.present?.(id);
+ if(!lines().length&&!['st1dc','st2dc','dc1inv','dc2inv','invac','acgrid','batinv'].some(boardPresent))
+  missing.push('Collegamenti FV non registrati');
  for(let k=1;k<=Math.min(sd.count,2);k++){
-  if(!lines().some(l=>strName(l.from,k)&&dc(l.to)||dc(l.from)&&strName(l.to,k)))
+  const key=k===1?'st1dc':'st2dc';
+  if(!boardPresent(key)&&!lines().some(l=>strName(l.from,k)&&dc(l.to)||dc(l.from)&&strName(l.to,k)))
    missing.push('Manca collegamento stringa FV'+k+' → quadro DC');
  }
- if(!hasConnection(dc,inverter))missing.push('Manca collegamento quadro DC → inverter');
- if(!hasConnection(inverter,ac))missing.push('Manca collegamento inverter → quadro AC');
- if(!hasConnection(ac,network))missing.push('Manca collegamento quadro AC → punto di connessione / contatore');
- if(hasStorage()&&!hasConnection(inverter,battery))missing.push('Manca collegamento inverter ↔ accumulo');
- return [...new Set(missing)];
+ if(!hasConnection(dc,inverter)&&!boardPresent('dc1inv'))missing.push('Manca collegamento quadro DC → inverter');
+ if(!hasConnection(inverter,ac)&&!boardPresent('invac'))missing.push('Manca collegamento inverter → quadro AC');
+ if(!hasConnection(ac,network)&&!boardPresent('acgrid'))missing.push('Manca collegamento quadro AC → punto di connessione / contatore');
+ if(hasStorage()&&!hasConnection(inverter,battery)&&!boardPresent('batinv'))missing.push('Manca collegamento inverter ↔ accumulo');
+ return [...new Set([...missing,...(window.vtPvBoards?.issues?.()||[])])];
 }
 function deviceLine(re){
  const d=devices().find(x=>re.test(x.type||''));
@@ -130,12 +133,16 @@ function svg(){
  const dcLine=describeLink(l=>dc(l.from)&&inverter(l.to)||inverter(l.from)&&dc(l.to));
  const acLine=describeLink(l=>ac(l.from)&&network(l.to)||network(l.from)&&ac(l.to));
  const checked=isReviewed();
- const hasS1=lines().some(l=>(strName(l.from,1)&&dc(l.to))||(dc(l.from)&&strName(l.to,1)));
- const hasS2=lines().some(l=>(strName(l.from,2)&&dc(l.to))||(dc(l.from)&&strName(l.to,2)));
- const hasDCtoINV=hasConnection(dc,inverter);
- const hasINVtoAC=hasConnection(inverter,ac);
- const hasACtoGrid=hasConnection(ac,network);
- const hasStorageLink=hasConnection(inverter,battery);
+ const bp=id=>!!window.vtPvBoards?.present?.(id);
+ const bg=(id,key)=>window.vtPvBoards?.get?.(id,key)||'';
+ const bl=id=>window.vtPvBoards?.routeLabel?.(id)||'';
+ const hasS1=bp('st1dc')||lines().some(l=>(strName(l.from,1)&&dc(l.to))||(dc(l.from)&&strName(l.to,1)));
+ const hasS2=bp('st2dc')||lines().some(l=>(strName(l.from,2)&&dc(l.to))||(dc(l.from)&&strName(l.to,2)));
+ const hasDC1toINV=bp('dc1inv')||lines().some(l=>(dc(l.from)&&inverter(l.to)||inverter(l.from)&&dc(l.to))&&!/ST2/.test(name(l.from)+name(l.to)));
+ const hasDC2toINV=bp('dc2inv')||lines().some(l=>(dc(l.from)&&inverter(l.to)||inverter(l.from)&&dc(l.to))&&/ST2/.test(name(l.from)+name(l.to)));
+ const hasINVtoAC=bp('invac')||hasConnection(inverter,ac);
+ const hasACtoGrid=bp('acgrid')||hasConnection(ac,network);
+ const hasStorageLink=bp('batinv')||hasConnection(inverter,battery);
  let h='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1195" width="100%" role="img" aria-label="Schema unifilare fotovoltaico automatico" style="display:block;width:100%;height:auto;background:white">'+
  '<rect x="2" y="2" width="996" height="1191" fill="white" stroke="#1b3045" stroke-width="3"/>'+
  '<rect x="12" y="12" width="976" height="112" fill="#f5f8fb"/>'+
@@ -145,8 +152,8 @@ function svg(){
  // DC string runs are represented separately; never create an unverified parallel connection.
  h+=wire(250,306,250,337,'#b5222d',hasS1)+wire(250,337,388,337,'#b5222d',hasS1)+wire(388,337,388,365,'#b5222d',hasS1);
  if(sd.count>=2)h+=wire(750,306,750,337,'#b5222d',hasS2)+wire(750,337,612,337,'#b5222d',hasS2)+wire(612,337,612,365,'#b5222d',hasS2);
- h+=wire(388,492,388,536,'#b5222d',hasDCtoINV);
- if(sd.count>=2)h+=wire(612,492,612,536,'#b5222d',hasDCtoINV);
+ h+=wire(388,492,388,536,'#b5222d',hasDC1toINV);
+ if(sd.count>=2)h+=wire(612,492,612,536,'#b5222d',hasDC2toINV);
  h+=wire(500,676,500,755,'#18548b',hasINVtoAC);
  h+=wire(500,871,500,945,'#18548b',hasACtoGrid);
  if(hasStorage()){
@@ -161,43 +168,49 @@ function svg(){
  h+=box(45,174,410,132,'STRINGA FV1',[
    sd.count?String(sd.each)+' moduli · '+cut(model,42):pvDescription,
    'Potenza modulo: '+(wp>0?wp+' Wp':'da indicare'),
-   s1[0],s1[1]
+   'Ingresso: '+(bg('ST1','mppt')||'MPPT da indicare'),
+   bl('st1dc')||s1[0]
  ],'#a9222a','#fcecef');
  h+=box(545,174,410,132,sd.count>=2?'STRINGA FV2':'SECONDO INGRESSO DC (DA VERIFICARE)',[
    sd.count>=2?String(sd.each)+' moduli · '+cut(model,42):'Stringa non dichiarata',
    'Totale stringhe: '+(sd.count||'da indicare'),
-   s2[0],s2[1]
+   'Ingresso: '+(bg('ST2','mppt')||'MPPT da indicare'),
+   bl('st2dc')||s2[0]
  ],'#a9222a','#fcecef');
  h+=box(290,365,420,127,'QUADRO DC / SEZIONAMENTO',[
-   dcProduct?'Apparato: '+dcProduct:'Apparato: da identificare',
-   state.vtPvDcProtectionDetail||state.vtPvDc||'Protezioni DC: da indicare',
-   'Percorsi DC distinti · MPPT da verificare'
+   'Sigla/involucro: '+(bg('QDC','sigla')||dcProduct||'da indicare'),
+   'Sezionamento: '+(bg('QDC','sez')||'da indicare'),
+   'SPD: '+(bg('QDC','spd')||'da indicare'),
+   'Fusibili: '+(bg('QDC','fusibili')||'da indicare')
  ],'#a9222a','#fcecef');
  h+=box(285,536,430,140,'INVERTER / CONVERSIONE DC-AC',[
    state.vtPvInverter||'Marca / modello da indicare',
    'Potenza AC nominale: '+invPower+' kW',
-   state.vtPvMppt?'Ingressi: '+state.vtPvMppt:'Ingressi MPPT da indicare',
-   dcLine[0]
+   'MPPT: '+(bg('INV','mppt')||state.vtPvMppt||'da indicare'),
+   'Uscita: '+(bg('INV','ac')||'da specificare')
  ],'#254b77','#edf3ff');
  if(hasStorage())h+=box(750,552,223,113,'ACCUMULO',[
    state.vtPvAccumulo||batProduct||'Batterie da definire',
    'Capacità: '+(state.vtPvAccumuloKwh||'—')+' kWh',
-   state.vtPvBatteryProtectionDetail||'Protezioni: da indicare'
+   'Protezione: '+(bg('BAT','fusibile')||state.vtPvBatteryProtectionDetail||'da indicare')
  ],'#7652a0','#f4effa');
  h+=box(285,755,430,116,'QUADRO AC / PROTEZIONI',[
-   acProduct?'Apparato: '+acProduct:'Apparato: da identificare',
-   state.vtPvAcProtectionDetail||state.vtPvAc||'Protezioni AC: da indicare',
-   acLine[0]
+   'Sigla/involucro: '+(bg('QAC','sigla')||acProduct||'da indicare'),
+   'MT/MTD: '+(bg('QAC','mt')||'da indicare'),
+   'RCD: '+(bg('QAC','rcd')||'da indicare'),
+   'SPD: '+(bg('QAC','spd')||'da indicare')
  ],'#235b86','#eaf4ff');
  h+=box(285,945,430,106,'PUNTO DI CONNESSIONE / RETE',[
    state.vtPvRete||'Sistema e punto di connessione da indicare',
-   'Interfaccia: '+(state.vtPvInterfaccia||'da specificare'),
-   acLine[1]
+   'Interfaccia: '+(bg('RETE','interfaccia')||state.vtPvInterfaccia||'da specificare'),
+   'PCC: '+(bg('RETE','punto')||'da verificare')
  ],'#2b5d75','#eaf6f8');
  h+=box(35,562,237,108,'PE / EQUIPOTENZIALITÀ',[
-   'Collegamenti da verificare',
-   state.vtPvTerra||'Dati terra da inserire'
+   'Sezione PE: '+(bg('PE','sezione')||'da indicare'),
+   bg('PE','terra')||state.vtPvTerra||'Dati terra da inserire'
  ],'#397a60','#effaf3');
+ h+=textAt(520,725,cut('Inverter→QAC: '+(bl('invac')||'tratta da indicare'),43),12,'#225a86');
+ h+=textAt(520,910,cut('QAC→rete: '+(bl('acgrid')||'tratta da indicare'),43),12,'#225a86');
  h+=textAt(40,1093,'DC: rosso   •   AC: blu   •   Accumulo: viola   •   PE: verde tratteggiato',14,'#34475c');
  h+=textAt(40,1112,'Grigio tratteggiato = collegamento NON registrato nella pratica',13,'#686e77');
  h+=textAt(40,1127,'Rif.: '+(state.vtSchemaRif||('FV-'+(state.practiceNo||'da numerare'))),14);
@@ -226,19 +239,14 @@ unifilar=function(){
  return '<div class="card"><h2>Schema unifilare fotovoltaico automatico</h2>'+
  '<p class="muted">Elaborato A4 generato da moduli, stringhe, inverter, accumulo e collegamenti già registrati. Le linee grigie tratteggiate indicano collegamenti non registrati, non confermati. I due ingressi DC restano distinti finché non viene verificata la topologia reale.</p>'+
  '<p><b>Stato:</b> '+(checked?'Verificato dal responsabile tecnico':'Da verificare')+'. '+note+'</p>'+
- '<h3>Dati di protezione e collegamento da riportare nel disegno</h3><div class="grid">'+
- detailInput('Stringhe → ingressi MPPT effettivi','vtPvMppt')+
- detailInput('Sezionatori, SPD e altre protezioni DC: tipo e valori','vtPvDcProtectionDetail')+
- detailInput('Protezione AC: MT/MTD, differenziale, SPD: tipo e valori','vtPvAcProtectionDetail')+
- (hasStorage()?detailInput('Protezione e cablaggio dell’accumulo','vtPvBatteryProtectionDetail'):'')+
- '</div>'+
+ '<p class="muted"><b>Per modificare i dettagli tecnici</b> compila le schede in «Quadri e circuiti»: stringhe, protezioni DC/AC, accumulo, terra e tutte le tratte con sezioni e lunghezze. Questo disegno si aggiorna direttamente da quei dati.</p>'+
  '<div class="vt-pv-schema-preview" style="max-width:860px;margin:16px auto;border:1px solid #c7d0d9;border-radius:8px;overflow:hidden">'+svg()+'</div>'+
  (missing.length?'<h3>Da completare prima della validazione tecnica</h3><ul>'+missing.map(x=>'<li>'+escXml(x)+'</li>').join('')+'</ul>':'<p>Tutti i dati minimi per richiedere la revisione risultano compilati. La correttezza elettrica resta da controllare.</p>')+
  '<div class="actions"><button type="button" onclick="vtPvUnifilar.print()">Stampa solo schema / PDF</button>'+
  '<button type="button" class="secondary" onclick="vtPvUnifilar.download()">Scarica schema SVG</button>'+
  '<button type="button" class="secondary" onclick="vtPvUnifilar.validate()">Conferma verifica del responsabile tecnico</button>'+
  '<button type="button" class="secondary" onclick="vtPvUnifilar.reset()">Revoca verifica</button></div>'+
- '<p class="muted">Per correggere la configurazione torna su <b>Impianto</b>, <b>Frutti e materiali</b> e <b>Quadri e circuiti</b>. Dopo ogni modifica lo schema viene rigenerato e la revisione precedente non vale più.</p></div>'+
+ '<p class="muted">Per correggere la configurazione torna su <b>Impianto</b> e <b>Quadri e circuiti</b>. Le modifiche tecniche richiedono una nuova verifica del responsabile tecnico.</p></div>'+
  '<div class="card"><h3>Collegamenti DC / AC utilizzati per generare lo schema</h3>'+table+'</div>';
 };
 const oldPrintPart=printPart;
