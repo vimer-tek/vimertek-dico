@@ -6,6 +6,7 @@ const files = [
   "vt-impianti-speciali-v198a.js",
   "vt-fv-unifilare-v1912.js",
   "vt-fv-quadri-v1913.js",
+  "vt-configuratore-quadri-v1914.js",
   "vt-centro-operativo-v199.js",
   "vt-completamento-v1910.js",
   "firma-vimertek-solo-grafica.js",
