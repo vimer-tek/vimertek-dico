@@ -67,6 +67,7 @@ function issues(){
   if(['mt','mtd','rcd','sez','fus','cont'].includes(d.type)&&(!d.poles||!d.rated))results.push(label+': poli o In mancanti');
   if(['rcd','mtd'].includes(d.type)&&(!d.delta||!d.rcdType))results.push(label+': tipo RCD o IΔn mancante');
   if(d.type==='spd'&&(!d.spdClass||!d.uc))results.push(label+': classe o Uc/Ucpv SPD mancante');
+  if(d.type==='spd'&&d.position==='serie')results.push(label+': SPD registrato in serie: verifica la topologia e usa la derivazione pertinente');
   if(d.type==='fus'&&!d.fuseType)results.push(label+': classe fusibile mancante');
   if(d.position==='derivazione'&&!d.installation)results.push(label+': collegamento derivazione/PE da indicare');
   if(d.position==='serie'&&Number(d.qty)>1)results.push(label+': più dispositivi in serie: inserirli individualmente');
@@ -180,6 +181,7 @@ const api={
   const d=read();if(!d)return;
   if(!boards().some(b=>b[0]===d.board)||!branches(d.board).some(b=>b[0]===d.branch))return alert('Seleziona un quadro e un ramo validi.');
   if(!types.some(x=>x[0]===d.type)||!d.tag)return alert('Indica tipo e sigla apparecchio.');
+  if(d.type==='spd'&&d.position==='serie')return alert('Uno SPD non va rappresentato come dispositivo in serie nel ramo. Indica la derivazione effettiva oppure lascia Da definire.');
   if(!/^[1-9][0-9]{0,2}$/.test(d.qty||''))return alert('Quantità: inserisci un intero positivo.');
   if(current().some(x=>x.tag.toUpperCase()===d.tag.toUpperCase()&&x.id!==editingId))return alert('Sigla già utilizzata in questo configuratore.');
   if(editingId){const i=all().findIndex(x=>x.id===editingId);if(i<0)return;all()[i]={...all()[i],...d};}
