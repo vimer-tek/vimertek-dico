@@ -47,9 +47,10 @@ const fields=[
  ['up','SPD Up (kV)','Da scheda tecnica'],
  ['fuseType','Classe fusibile','gPV / gG / ...'],
  ['installation','Collegamento / PE / coordinamento','Da specificare realmente'],
+ ['tapTarget','Destinazione derivazione (solo se in derivazione)','Es. PE, tra + e −, L-N, morsetti identificati'],
  ['notes','Note tecniche','Ubicazione, circuito, targa']
 ];
-const commonFields=['tag','brand','model','qty','installation','notes'];
+const commonFields=['tag','brand','model','qty','installation','tapTarget','notes'];
 const specificFields={mt:['poles','rated','voltage','curve','breaking'],mtd:['poles','rated','voltage','curve','breaking','delta','rcdType'],rcd:['poles','rated','voltage','delta','rcdType'],spd:['poles','spdClass','uc','up'],sez:['poles','rated','voltage'],fus:['poles','rated','voltage','breaking','fuseType'],cont:['poles','rated','voltage'],other:['poles','rated','voltage']};
 const applicable=(type,key)=>commonFields.includes(key)||(specificFields[type]||[]).includes(key);
 const conflicts=d=>fields.filter(x=>!applicable(d.type,x[0])&&get(d,x[0])).map(x=>x[0]);
@@ -78,7 +79,7 @@ function issues(){
   if(d.type==='spd'&&d.position==='serie')results.push(label+': SPD registrato in serie: verifica la topologia e usa la derivazione pertinente');
   if(d.type==='fus'&&!d.fuseType)results.push(label+': classe fusibile mancante');
   if(d.position==='derivazione'&&!d.installation)results.push(label+': collegamento derivazione/PE da indicare');
-  if(d.position==='serie'&&Number(d.qty)>1)results.push(label+': più dispositivi in serie: inserirli individualmente');
+  if((d.position==='serie'||fv()&&d.position==='derivazione')&&Number(d.qty)>1)results.push(label+': più dispositivi in serie: inserirli individualmente');
  }
  return results;
 }
@@ -168,7 +169,7 @@ function diagram(){
  }).join('');
 }
 function table(){
- const rows=current().map(d=>'<tr><td>'+esc(boardLabel(d.board)+' / '+branchLabel(d.board,d.branch))+'</td><td>'+esc(d.tag)+'</td><td>'+esc(typeName(d.type))+'</td><td>'+esc(d.brand+' '+d.model)+'</td><td>'+esc(description(d))+'</td><td>'+esc(d.position||'Da definire')+'</td></tr>').join('');
+ const rows=current().map(d=>'<tr><td>'+esc(boardLabel(d.board)+' / '+branchLabel(d.board,d.branch))+'</td><td>'+esc(d.tag)+'</td><td>'+esc(typeName(d.type))+'</td><td>'+esc(d.brand+' '+d.model)+'</td><td>'+esc([description(d),d.installation,d.tapTarget,d.notes].filter(Boolean).join(' · '))+'</td><td>'+esc(d.position||'Da definire')+'</td></tr>').join('');
  return '<section class="print-section"><h2>Dispositivi e protezioni registrati nei quadri</h2><p>Le caratteristiche sono dichiarate dall’installatore e devono corrispondere alle targhette ed al progetto applicabile.</p><table><thead><tr><th>Quadro / ramo</th><th>Sigla</th><th>Tipo</th><th>Marca / modello</th><th>Caratteristiche</th><th>Posizione</th></tr></thead><tbody>'+rows+'</tbody></table></section>';
 }
 const oldCircuits=circuits;
@@ -178,11 +179,12 @@ circuits=function(){
  return fv()?form()+existing:existing+form();
 };
 const oldUnifilar=unifilar;
-unifilar=function(){return oldUnifilar()+(enabled()&&current().length?'<div class="card"><h2>Schema dispositivi e protezioni per ramo</h2><p class="muted">I simboli sono collocati solo nella posizione scelta, senza creare collegamenti fra rami non documentati.</p>'+diagram()+'</div>':'');};
+unifilar=function(){return oldUnifilar()+(enabled()&&!fv()&&current().length?'<div class="card"><h2>Schema dispositivi e protezioni per ramo</h2><p class="muted">I simboli sono collocati solo nella posizione scelta, senza creare collegamenti fra rami non documentati.</p>'+diagram()+'</div>':'');};
 const oldPrintPart=printPart;
 printPart=function(id){
  const base=oldPrintPart(id);
  if(!enabled()||id!=='unifilar'||!current().length)return base;
+ if(fv())return state.vtPvPrintDetails===true?base+table():base;
  return base+'<section class="print-section"><h2>Dettaglio protezioni dei quadri</h2>'+diagram()+'</section>'+table();
 };
 if(window.vtPvBoards){
