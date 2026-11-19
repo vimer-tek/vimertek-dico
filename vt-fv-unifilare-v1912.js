@@ -38,7 +38,7 @@ function hasStorage(){
 }
 function fingerprint(){
  return JSON.stringify({
-  tipo:state.installationType,doc:state.doc,
+  layout:'FV-U01-A3-v1916',pe:state.vtPvUnifiedPE||{},tipo:state.installationType,doc:state.doc,
   fields:FIELDS.map(k=>String(state[k]??'')),
   connections:lines(),components:devices(),boardDetails:state.vtPvBoardData||null,
   protectionDevices:(state.vtQuadroDevices||[]).filter(x=>x.category==='FV')
@@ -93,7 +93,7 @@ function issues(){
  if(!hasConnection(inverter,ac)&&!boardPresent('invac'))missing.push('Manca collegamento inverter → quadro AC');
  if(!hasConnection(ac,network)&&!boardPresent('acgrid'))missing.push('Manca collegamento quadro AC → punto di connessione / contatore');
  if(hasStorage()&&!hasConnection(inverter,battery)&&!boardPresent('batinv'))missing.push('Manca collegamento inverter ↔ accumulo');
- return [...new Set([...missing,...(window.vtPvBoards?.issues?.()||[])])];
+ return [...new Set([...missing,...(window.vtPvBoards?.issues?.()||[]),...(window.vtPvUnified?.issues?.()||[])])];
 }
 function deviceLine(re){
  const d=devices().find(x=>re.test(x.type||''));
@@ -124,6 +124,7 @@ function box(x,y,w,h,heading,rows,border='#34485d',color='#f3f7fb'){
  return out;
 }
 function svg(){
+ if(window.vtPvUnified)return window.vtPvUnified.svg(isReviewed());
  const sd=stringData(),n=number(state.vtPvNmoduli),wp=number(state.vtPvWpModulo);
  const kWp=n>0&&wp>0?(n*wp/1000).toLocaleString('it-IT',{maximumFractionDigits:3}):'—';
  const invPower=String(state.vtPvPotenzaInverter||'—');
@@ -244,13 +245,13 @@ unifilar=function(){
  t.map(x=>'<tr><td>'+escXml(x.from)+'</td><td>'+escXml(x.to)+'</td><td>'+escXml(x.cable)+'</td><td>'+escXml(x.note)+'</td></tr>').join('')+
  '</tbody></table>':structured?'':'<p>Nessun collegamento registrato.</p>');
  return '<div class="card"><h2>Schema unifilare fotovoltaico automatico</h2>'+
- '<p class="muted">Elaborato A4 generato da moduli, stringhe, inverter, accumulo e collegamenti già registrati. Le linee grigie tratteggiate indicano collegamenti non registrati, non confermati. I due ingressi DC restano distinti finché non viene verificata la topologia reale.</p>'+
+ '<p class="muted">Elaborato unico A3 orizzontale: stringhe, dispositivi e protezioni sui rispettivi percorsi, inverter, accumulo e rete. I simboli sono schematici. Le linee grigie tratteggiate indicano collegamenti non registrati, non confermati. I due ingressi DC restano distinti finché non viene verificata la topologia reale.</p>'+
  '<p><b>Stato:</b> '+(checked?'Verificato dal responsabile tecnico':'Da verificare')+'. '+note+'</p>'+
  '<p class="muted"><b>Per modificare i dettagli tecnici</b> compila le schede in «Quadri e circuiti»: stringhe, protezioni DC/AC, accumulo, terra e tutte le tratte con sezioni e lunghezze. Questo disegno si aggiorna direttamente da quei dati.</p>'+
- '<div class="vt-pv-schema-preview" style="max-width:860px;margin:16px auto;border:1px solid #c7d0d9;border-radius:8px;overflow:hidden">'+svg()+'</div>'+
+ (window.vtPvUnified?.panel?.()||'')+'<div class="vt-pv-schema-preview" style="max-width:1500px;margin:16px auto;border:1px solid #c7d0d9;border-radius:8px;overflow-x:auto">'+svg()+'</div>'+
  (missing.length?'<h3>Da completare prima della validazione tecnica</h3><ul>'+missing.map(x=>'<li>'+escXml(x)+'</li>').join('')+'</ul>':'<p>Tutti i dati minimi per richiedere la revisione risultano compilati. La correttezza elettrica resta da controllare.</p>')+
  '<div class="actions"><button type="button" onclick="vtPvUnifilar.print()">Stampa solo schema / PDF</button>'+
- '<button type="button" class="secondary" onclick="vtPvUnifilar.download()">Scarica schema SVG</button>'+
+ '<button type="button" class="secondary" onclick="vtPvUnifilar.download()">Scarica schema SVG</button>'+ '<label style="display:flex;align-items:center;gap:8px"><input style="width:auto" type="checkbox" '+(state.vtPvPrintDetails===true?'checked':'')+' onchange="vtPvUnifilar.includeDetails(this.checked)"> Includi tabelle tecniche opzionali nel PDF</label>'+
  '<button type="button" class="secondary" onclick="vtPvUnifilar.validate()">Conferma verifica del responsabile tecnico</button>'+
  '<button type="button" class="secondary" onclick="vtPvUnifilar.reset()">Revoca verifica</button></div>'+
  '<p class="muted">Per correggere la configurazione torna su <b>Impianto</b> e <b>Quadri e circuiti</b>. Le modifiche tecniche richiedono una nuova verifica del responsabile tecnico.</p></div>'+
@@ -260,15 +261,12 @@ const oldPrintPart=printPart;
 printPart=function(id){
  if(!fvActive()||id!=='unifilar')return oldPrintPart(id);
  const check=isReviewed();
- return '<section class="print-section vt-unifilar-sheet"><h2>Schema unifilare fotovoltaico · '+escXml(state.practiceNo||'')+'</h2>'+
- '<div class="vt-unifilar-sheet-svg">'+svg()+'</div>'+
- '<p style="font-size:8pt;margin:2mm 0">Stato: '+(check?'revisionato dal responsabile tecnico':'DA VERIFICARE')+
- '. Rappresentazione automatica dei dati registrati; protezioni, sezioni, percorsi e connessioni richiedono confronto con impianto, schemi e progetto pertinenti.</p></section>';
+ return '<section class="print-section vt-unifilar-sheet vt-fv-a3"><div class="vt-unifilar-sheet-svg">'+svg()+'</div></section>';
 };
 const oldAvailable=availablePrintSections;
 availablePrintSections=function(){
  return oldAvailable().map(([id,title])=>fvActive()&&id==='unifilar'?
-  [id,'Schema unifilare fotovoltaico (A4)']:[id,title]);
+  [id,'Schema unifilare fotovoltaico · tavola unica A3']:[id,title]);
 };
 const oldValidation=vtDicoDatiMancanti;
 vtDicoDatiMancanti=function(){
@@ -279,6 +277,7 @@ vtDicoDatiMancanti=function(){
 };
 window.vtPvUnifilar={
  print(){printDocuments(['unifilar']);},
+ includeDetails(value){if(state.vtPro?.locked)return;state.vtPvPrintDetails=!!value;save(false);},
  edit(key,value){
   if(!fvActive()||!FIELDS.includes(key))return;
   state[key]=String(value);
@@ -295,7 +294,7 @@ window.vtPvUnifilar={
   setTimeout(()=>URL.revokeObjectURL(url),15000);
  },
  validate(){
-  if(!fvActive())return;
+  if(!fvActive()||state.vtPro?.locked)return;
   const missing=issues();
   if(missing.length){alert('Non è possibile confermare lo schema. Completa prima:\n\n• '+missing.join('\n• '));return;}
   if(!confirm('Hai verificato personalmente topologia, separazione stringhe / MPPT, protezioni DC/AC, sezioni e percorsi dei cavi, accumulo, messa a terra e connessione rete rispetto all’impianto realizzato? Questa conferma non sostituisce progetto, verifiche o firma.'))return;
