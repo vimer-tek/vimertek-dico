@@ -84,7 +84,7 @@ let measureEdit=null;
 function normalizeMeasure(value,unit){
  let v=String(value??'').trim(),u=String(unit??'').trim();
  const aliases={'ohm':'Ω','ohms':'Ω','ω':'Ω','kohm':'kΩ','kohms':'kΩ','kω':'kΩ','mohm':'MΩ','mohms':'MΩ','mω':'MΩ','ms':'ms','v':'V','a':'A','ma':'mA','s':'s','hz':'Hz'};
- const canon=x=>aliases[String(x).toLowerCase()]||String(x);
+ const canon=x=>{const v=String(x);if(/^[mMkK]Ω$/.test(v))return v==='KΩ'?'kΩ':v;return aliases[v.toLowerCase()]||v;};
  const match=v.match(/^([<>≤≥]?\s*[+-]?\d+(?:[.,]\d+)?)\s*(ohms?|kohms?|mohms?|[kM]?Ω|ms|mA|Hz|V|A|s)$/i);
  if(match&&(!u||canon(match[2])===canon(u))){v=match[1];u=canon(match[2]);}
  u=canon(u);
@@ -92,7 +92,7 @@ function normalizeMeasure(value,unit){
  return {value:v,unit:u};
 }
 function measureText(x){const n=normalizeMeasure(x.value,x.unit);return [n.value,n.unit].filter(Boolean).join(' ');}
-function resetMeasureApproval(p){if(p.documents)p.documents.tests=false;state.dicoTestsVerified='';if(state.vtV1910?.ministerial?.checks&&typeof state.vtV1910.ministerial.checks==='object'){/* separate ministerial confirmation is not inferred */}}
+function resetMeasureApproval(p){if(p.documents)p.documents.tests=false;state.dicoTestsVerified='';if(state.vtV1910?.ministerial)state.vtV1910.ministerial.confirmTesting=false;}
 function instrumentsHTML(){
   const p=store();
   return card('Strumenti di misura e rapporti di prova',`<p class="muted">Inserisci valori misurati realmente, metodo e identificazione dello strumento. Le misure non vengono generate dal software.</p>
