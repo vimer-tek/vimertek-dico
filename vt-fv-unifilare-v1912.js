@@ -238,9 +238,11 @@ unifilar=function(){
   '. Ogni modifica tecnica richiede una nuova revisione.':
   'Schema generato automaticamente: non validato. Le connessioni non registrate non possono essere considerate accertate.';
  const t=lines();
- const table=t.length?'<table class="table"><thead><tr><th>Origine</th><th>Destinazione</th><th>Cavo</th><th>Note</th></tr></thead><tbody>'+
+ const structured=Object.values(state.vtPvBoardData?.routes||{}).filter(r=>r&&Object.values(r).some(v=>String(v??'').trim())).length;
+ const table=(structured?'<p><b>'+structured+' tratte compilate nelle schede Quadri e circuiti.</b> Il riepilogo completo di cavi, sezioni, lunghezze e stato di verifica è nella sezione Dettagli quadri e collegamenti FV qui sotto.</p>':'')+
+ (t.length?'<h4>Collegamenti registrati nel precedente editor</h4><table class="table"><thead><tr><th>Origine</th><th>Destinazione</th><th>Cavo</th><th>Note</th></tr></thead><tbody>'+
  t.map(x=>'<tr><td>'+escXml(x.from)+'</td><td>'+escXml(x.to)+'</td><td>'+escXml(x.cable)+'</td><td>'+escXml(x.note)+'</td></tr>').join('')+
- '</tbody></table>':'<p>Nessun collegamento registrato.</p>';
+ '</tbody></table>':structured?'':'<p>Nessun collegamento registrato.</p>');
  return '<div class="card"><h2>Schema unifilare fotovoltaico automatico</h2>'+
  '<p class="muted">Elaborato A4 generato da moduli, stringhe, inverter, accumulo e collegamenti già registrati. Le linee grigie tratteggiate indicano collegamenti non registrati, non confermati. I due ingressi DC restano distinti finché non viene verificata la topologia reale.</p>'+
  '<p><b>Stato:</b> '+(checked?'Verificato dal responsabile tecnico':'Da verificare')+'. '+note+'</p>'+
