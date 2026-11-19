@@ -197,6 +197,22 @@ if(window.vtPvBoards){
       Object.values(state.vtPvBoardData?.sections?.[key]||{}).some(x=>String(x||'').trim());
    if(relevant&&!current().some(d=>d.board===key))r.push('Aggiungere dispositivi nel '+label);
   }
+  // The operator has already declared these protections in the board sheets.
+  // Do not guess part numbers or quantities: ask them to register individual devices.
+  const required=[
+   ['QDC','sez',['sez'],'sezionatore DC'],
+   ['QDC','fusibili',['fus'],'fusibili DC'],
+   ['QDC','spd',['spd'],'SPD DC'],
+   ['QAC','mt',['mt','mtd'],'magnetotermico / MTD AC'],
+   ['QAC','rcd',['rcd','mtd'],'differenziale AC'],
+   ['QAC','spd',['spd'],'SPD AC']
+  ];
+  for(const [board,field,types,label] of required){
+   const value=String(state.vtPvBoardData?.sections?.[board]?.[field]||'').trim();
+   if(!value||/^(?:non previst[oi]|assent[ei]|non applicabile|nessun[oa]?)\b/i.test(value))continue;
+   if(!current().some(d=>d.board===board&&types.includes(d.type)&&!conflicts(d).length&&['serie','derivazione'].includes(d.position)))
+    r.push('Configuratore: registrare separatamente '+label+' dichiarato nella scheda '+board);
+  }
   r.push(...issues());return [...new Set(r)];
  };
 }
