@@ -193,7 +193,7 @@ const oldUnifilar=unifilar;
 unifilar=function(){return active()?oldUnifilar()+summaryHTML(false):oldUnifilar();};
 const oldPrintPart=printPart;
 printPart=function(id){if(!active()||id!=='unifilar')return oldPrintPart(id);
- return oldPrintPart(id)+summaryHTML(true);
+ return oldPrintPart(id)+(state.vtPvPrintDetails===true?summaryHTML(true):'');
 };
 window.vtPvBoards={
  get,details,present,confirmed,effective,issues,summaryHTML,
