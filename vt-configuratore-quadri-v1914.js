@@ -49,9 +49,13 @@ const fields=[
  ['installation','Collegamento / PE / coordinamento','Da specificare realmente'],
  ['notes','Note tecniche','Ubicazione, circuito, targa']
 ];
+const commonFields=['tag','brand','model','qty','installation','notes'];
+const specificFields={mt:['poles','rated','voltage','curve','breaking'],mtd:['poles','rated','voltage','curve','breaking','delta','rcdType'],rcd:['poles','rated','voltage','delta','rcdType'],spd:['poles','spdClass','uc','up'],sez:['poles','rated','voltage'],fus:['poles','rated','voltage','breaking','fuseType'],cont:['poles','rated','voltage'],other:['poles','rated','voltage']};
+const applicable=(type,key)=>commonFields.includes(key)||(specificFields[type]||[]).includes(key);
+const conflicts=d=>fields.filter(x=>!applicable(d.type,x[0])&&get(d,x[0])).map(x=>x[0]);
 const opt=(k,label,value)=>'<option value="'+esc(k)+'"'+(k===value?' selected':'')+'>'+esc(label)+'</option>';
 const sel=(k,label,vals,value)=>'<label>'+esc(label)+'<select data-vtdev="'+k+'">'+vals.map(x=>opt(x[0],x[1],value)).join('')+'</select></label>';
-const inp=(k,label,placeholder,value)=>'<label>'+esc(label)+'<input data-vtdev="'+k+'" placeholder="'+esc(placeholder)+'" value="'+esc(value)+'"></label>';
+const inp=(k,label,placeholder,value,type)=>'<label data-vtdev-field="'+k+'"'+(applicable(type,k)?'':' hidden style="display:none"')+'>'+esc(label)+'<input data-vtdev="'+k+'" placeholder="'+esc(placeholder)+'" value="'+esc(value)+'"'+(applicable(type,k)?'':' disabled')+'></label>';
 const btn=(label,action,id='',style='secondary')=>'<button type="button" class="'+style+'" data-vtdevice-action="'+action+'" data-id="'+esc(id)+'">'+esc(label)+'</button>';
 const description=d=>[d.tag,[d.brand,d.model].filter(Boolean).join(' '),Number(d.qty)>1?'Quantità '+d.qty:'',d.poles?d.poles:'',d.rated?d.rated+' A':'',d.curve?'curva '+d.curve:'',d.breaking?d.breaking+' kA':'',d.delta?'IΔn '+d.delta+' mA':'',d.rcdType?'tipo '+d.rcdType:'',d.spdClass?'SPD '+d.spdClass:'',d.uc?'Uc/Ucpv '+d.uc+' V':'',d.up?'Up '+d.up+' kV':'',d.fuseType?'fusibile '+d.fuseType:'',d.voltage?d.voltage+' V':''].filter(Boolean).join(' · ');
 function issues(){
@@ -61,6 +65,10 @@ function issues(){
   const label=d.tag||typeName(d.type);
   if(!d.tag||!d.board||!d.branch)results.push(label+': identificazione quadro, ramo e sigla mancante');
   if(!d.position)results.push(label+': scegliere la posizione in serie / derivazione / solo elenco');
+  if(conflicts(d).length)results.push(label+': caratteristiche di apparecchi diversi nella stessa scheda; separare i dispositivi e ricontrollare');
+  if(!boards().some(x=>x[0]===d.board)||!branches(d.board).some(x=>x[0]===d.branch))results.push(label+': quadro o ramo non più disponibile');
+  if(['mt','mtd'].includes(d.type)&&(!d.curve||!d.breaking))results.push(label+': curva o potere di interruzione da specificare');
+  if(d.type==='spd'&&!d.up)results.push(label+': Up SPD da specificare');
   if(d.verified!==true)results.push(label+': verificare apparecchio e dati di targa');
   if(!d.brand||!d.model)results.push(label+': marca/modello mancanti');
   if(!/^[1-9][0-9]{0,2}$/.test(String(d.qty||'')))results.push(label+': quantità non valida');
@@ -84,8 +92,9 @@ function form(){
  '<h3>'+(editingId?'Modifica apparecchio':'Aggiungi apparecchio')+'</h3><div class="grid">'+
  sel('board','Quadro',brds,board)+sel('branch','Ramo / circuito',br,branch)+
  sel('type','Tipo di apparecchio',types,d.type||'mt')+sel('position','Posizione nello schema',placements,d.position||'')+
- fields.map(x=>inp(x[0],x[1],x[2],d[x[0]]||(x[0]==='qty'?'1':''))).join('')+'</div>'+
- '<label><input data-vtdev="verified" type="checkbox"'+(d.verified?' checked':'')+'> Confermo di aver controllato le caratteristiche dell’apparecchio e la sua installazione</label>';
+ fields.map(x=>inp(x[0],x[1],x[2],d[x[0]]||(x[0]==='qty'?'1':''),d.type||'mt')).join('')+'</div>'+
+ (editingId&&conflicts(d).length?'<p role="alert" style="color:#a32920"><b>Attenzione:</b> questa vecchia scheda contiene dati di altri tipi di apparecchio: '+esc(conflicts(d).map(k=>fields.find(x=>x[0]===k)[1]+': '+d[k]).join(' · '))+'. Trascrivili nelle schede separate. Al salvataggio verranno conservati nello storico, non nel simbolo di questo apparecchio.</p>':'')+
+ '<label style="display:flex;align-items:center;gap:10px;flex-wrap:nowrap"><input style="width:auto;flex:none" data-vtdev="verified" type="checkbox"'+(d.verified&&!conflicts(d).length?' checked':'')+'> Confermo di aver controllato le caratteristiche dell’apparecchio e la sua installazione</label>';
  if(old.length){
   h+='<div class="grid"><label>Materiale già presente nella pratica<select id="vtdevice-material">'+opt('','Seleziona per copiare marca e modello','')+
   old.map((x,i)=>opt(String(i),[x.type,x.brand,x.model].filter(Boolean).join(' · '),'')).join('')+'</select></label>'+
@@ -130,7 +139,7 @@ function diagram(){
   svgText(95,83,'Ingresso del ramo · verificare origine',13)+
   '<path d="M'+cx+' 96 V'+(h-60)+'" stroke="#264f75" stroke-width="3" fill="none"/>';
   g.items.forEach((d,i)=>{
-   const y=138+i*120,p=d.position;
+   const y=138+i*120,p=conflicts(d).length?'':d.position;
    if(p==='serie'){
     s+='<rect x="'+(cx-38)+'" y="'+(y-27)+'" width="76" height="54" fill="white" stroke="#1e5579" stroke-width="3"/>'+
     '<path d="M'+(cx-22)+' '+(y+18)+' L'+(cx+22)+' '+(y-18)+'" stroke="#1e5579" stroke-width="3" fill="none"/>'+
@@ -143,11 +152,13 @@ function diagram(){
     if(d.type==='spd')s+='<path d="M353 '+(y+27)+' v15 m-12 0 h24 m-19 5 h14 m-9 5 h4" stroke="'+(d.installation&&d.verified?'#16856b':'#949da8')+'"'+(d.installation&&d.verified?'':' stroke-dasharray="6 4"')+' stroke-width="2" fill="none"/>';
    }else{
     s+='<rect x="306" y="'+(y-25)+'" width="85" height="50" fill="#fafafa" stroke="#949da8" stroke-width="2" stroke-dasharray="7 5"/>'+
-    svgText(314,y+4,p==='censimento'?'ELENCO':'NON DEF.',12);
+    svgText(314,y+4,p==='censimento'?'ELENCO':conflicts(d).length?'DATI MISTI':'NON DEF.',12);
    }
    s+=svgText(420,y-17,d.tag+' · '+typeName(d.type),16,true)+
-    svgText(420,y+5,description(d),13)+
-    svgText(420,y+24,p==='serie'?'Dispositivo in serie':p==='derivazione'?'Dispositivo in derivazione':p==='censimento'?'Solo censimento':'Connessione non definita',12);
+    svgText(420,y+5,description(d).split(' · ').slice(0,4).join(' · '),13)+
+    svgText(420,y+23,description(d).split(' · ').slice(4,8).join(' · '),12)+
+    svgText(420,y+41,description(d).split(' · ').slice(8).join(' · '),12)+
+    svgText(420,y+59,conflicts(d).length?'Separare le caratteristiche dei dispositivi':p==='serie'?'Dispositivo in serie':p==='derivazione'?'Dispositivo in derivazione':p==='censimento'?'Solo censimento':'Connessione non definita',12);
   });
   s+=svgText(95,h-26,'Uscita ramo · confrontare con lo schema dei collegamenti',13)+'</svg>';
   return '<section class="vt-quadri-schema" style="break-inside:avoid;margin:12px 0"><h3>'+esc(boardLabel(g.board))+' · '+esc(branchLabel(g.board,g.branch))+'</h3>'+s+'</section>';
@@ -196,6 +207,14 @@ const api={
   if(d.type==='spd'&&d.position==='serie')return alert('Uno SPD non va rappresentato come dispositivo in serie nel ramo. Indica la derivazione effettiva oppure lascia Da definire.');
   if(!/^[1-9][0-9]{0,2}$/.test(d.qty||''))return alert('Quantità: inserisci un intero positivo.');
   if(current().some(x=>x.tag.toUpperCase()===d.tag.toUpperCase()&&x.id!==editingId))return alert('Sigla già utilizzata in questo configuratore.');
+  const invalidKeys=conflicts(d);
+  if(invalidKeys.length){
+   if(!confirm('Sono presenti dati non pertinenti al tipo selezionato. Verranno conservati nello storico della scheda, ma non nello schema di questo apparecchio. Confermi? Registra separatamente gli altri apparecchi.'))return;
+   const archived=Object.fromEntries(invalidKeys.map(k=>[k,d[k]]));
+   d.previousMixedFields=[...(editing()?.previousMixedFields||[]),{date:new Date().toISOString(),fields:archived}];
+   for(const k of invalidKeys)d[k]='';
+   d.verified=false;
+  }
   if(editingId){const i=all().findIndex(x=>x.id===editingId);if(i<0)return;all()[i]={...all()[i],...d};}
   else all().push({...d,id:uuid(),category:fv()?'FV':'ELETTRICO'});
   editingId='';invalid();save(false);render();
@@ -207,6 +226,18 @@ const api={
   if(locked())return;const a=all(),i=a.findIndex(x=>x.id===id);if(i<0)return;
   const d=a[i],idx=a.map((x,j)=>({x,j})).filter(o=>o.x.category===d.category&&o.x.board===d.board&&o.x.branch===d.branch).map(o=>o.j);
   const k=idx.indexOf(i),j=idx[k+n];if(j===undefined)return;[a[i],a[j]]=[a[j],a[i]];invalid();save(false);render();
+ },
+ typeChanged(){
+  const root=document.getElementById('vtdevice-configurator');
+  const type=root?.querySelector('[data-vtdev="type"]')?.value;
+  if(!root||!type)return;
+  for(const label of root.querySelectorAll('[data-vtdev-field]')){
+   const shown=applicable(type,label.dataset.vtdevField);
+   label.hidden=!shown;label.style.display=shown?'':'none';
+   const el=label.querySelector('input');if(el)el.disabled=!shown;
+  }
+  const pos=root.querySelector('[data-vtdev="position"]');
+  if(pos&&type==='spd'&&pos.value==='serie')pos.value='';
  },
  boardChanged(){
   const root=document.getElementById('vtdevice-configurator'),b=root?.querySelector('[data-vtdev="board"]')?.value,d=root?.querySelector('[data-vtdev="branch"]');
@@ -224,6 +255,10 @@ const api={
 window.vtQuadroConfigurator=api;
 document.addEventListener('change',e=>{
  if(e.target?.matches?.('#vtdevice-configurator [data-vtdev="board"]'))api.boardChanged();
+ if(e.target?.matches?.('#vtdevice-configurator [data-vtdev="type"]'))api.typeChanged();
+ if(e.target?.matches?.('#vtdevice-configurator [data-vtdev]:not([data-vtdev="verified"])')){
+  const v=document.querySelector('#vtdevice-configurator [data-vtdev="verified"]');if(v)v.checked=false;
+ }
 });
 document.addEventListener('click',e=>{
  const el=e.target?.closest?.('[data-vtdevice-action]');if(!el)return;
