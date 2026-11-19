@@ -80,15 +80,28 @@ function modelHTML(){return card('Modello ministeriale Di.Co. — Allegato I',`<
  <p><a href="https://www.gazzettaufficiale.it/atto/vediMenuHTML?atto.codiceRedazionale=10A08437&atto.dataPubblicazioneGazzetta=2010-07-13&tipoSerie=serie_generale&tipoVigenza=originario" target="_blank" rel="noopener noreferrer">Apri il D.M. 19 maggio 2010 e l'Allegato I sulla Gazzetta Ufficiale ↗</a></p>
  <button class="secondary" type="button" onclick="vtPro.exportMappa()">Scarica dati per compilare l'Allegato I</button>
  <p class="muted">La mappa dei dati è un supporto alla compilazione, non un modulo ministeriale sostitutivo.</p>`);}
+let measureEdit=null;
+function normalizeMeasure(value,unit){
+ let v=String(value??'').trim(),u=String(unit??'').trim();
+ const aliases={'ohm':'Ω','ohms':'Ω','ω':'Ω','kohm':'kΩ','kohms':'kΩ','kω':'kΩ','mohm':'MΩ','mohms':'MΩ','mω':'MΩ','ms':'ms','v':'V','a':'A','ma':'mA','s':'s','hz':'Hz'};
+ const canon=x=>aliases[String(x).toLowerCase()]||String(x);
+ const match=v.match(/^([<>≤≥]?\s*[+-]?\d+(?:[.,]\d+)?)\s*(ohms?|kohms?|mohms?|[kM]?Ω|ms|mA|Hz|V|A|s)$/i);
+ if(match&&(!u||canon(match[2])===canon(u))){v=match[1];u=canon(match[2]);}
+ u=canon(u);
+ if(/^[<>≤≥]?\s*[+-]?\d+(?:\.\d+)?$/.test(v))v=v.replace('.',',');
+ return {value:v,unit:u};
+}
+function measureText(x){const n=normalizeMeasure(x.value,x.unit);return [n.value,n.unit].filter(Boolean).join(' ');}
+function resetMeasureApproval(p){if(p.documents)p.documents.tests=false;state.dicoTestsVerified='';if(state.vtV1910?.ministerial?.checks&&typeof state.vtV1910.ministerial.checks==='object'){/* separate ministerial confirmation is not inferred */}}
 function instrumentsHTML(){
   const p=store();
   return card('Strumenti di misura e rapporti di prova',`<p class="muted">Inserisci valori misurati realmente, metodo e identificazione dello strumento. Le misure non vengono generate dal software.</p>
   <h3>Registro strumenti</h3><div class="grid">${fieldHTML('instrumentName','Strumento / marca e modello')}${fieldHTML('instrumentSerial','Matricola')}${fieldHTML('instrumentExpiry','Scadenza taratura (se pertinente)','date')}${fieldHTML('instrumentNotes','Note / certificato')}</div>
   <button type="button" onclick="vtPro.addInstrument()">+ Registra strumento</button>
   ${p.instruments.length?`<table class="table"><tr><th>Strumento / matricola</th><th>Taratura</th><th></th></tr>${p.instruments.map((x,i)=>`<tr><td>${escV(x.name)}<br>${escV(x.serial)}</td><td>${escV(x.expiry||'Da verificare')}</td><td><button class="secondary" onclick="vtPro.delInstrument(${i})">Rimuovi</button></td></tr>`).join('')}</table>`:''}
-  <h3>Misurazioni effettive</h3><div class="grid">${fieldHTML('measureDate','Data misura','date',today())}${fieldHTML('measureCircuit','Quadro / circuito')}${fieldHTML('measureTest','Prova / parametro')}${fieldHTML('measureValue','Valore misurato')}${fieldHTML('measureUnit','Unità (Ω, MΩ, ms, A...)')}${fieldHTML('measureMethod','Metodo / condizioni')}${selectHTML('measureInstrument','Strumento',[ '',...p.instruments.map(x=>x.name+' · '+x.serial)])}${selectHTML('measureOutcome','Esito',['Da verificare','Conforme','Non conforme','Non applicabile'],'Da verificare')}</div>
-  <button type="button" onclick="vtPro.addMeasure()">+ Registra misura</button>
-  ${p.measurements.length?`<table class="table"><tr><th>Prova / circuito</th><th>Risultato</th><th>Esito</th><th></th></tr>${p.measurements.map((x,i)=>`<tr><td>${escV(x.test)}<br>${escV(x.circuit)}</td><td>${escV(x.value)} ${escV(x.unit)}</td><td>${escV(x.outcome)}</td><td><button class="secondary" onclick="vtPro.delMeasure(${i})">×</button></td></tr>`).join('')}</table>`:''}
+  <h3 id="vtp-measure-heading">Misurazioni effettive</h3><div class="grid">${fieldHTML('measureDate','Data misura','date',today())}${fieldHTML('measureCircuit','Quadro / circuito')}${fieldHTML('measureTest','Prova / parametro')}${fieldHTML('measureValue','Valore misurato')}${fieldHTML('measureUnit','Unità (Ω, MΩ, ms, A...)')}${fieldHTML('measureMethod','Metodo / condizioni')}${selectHTML('measureInstrument','Strumento',[ '',...p.instruments.map(x=>x.name+' · '+x.serial)])}${selectHTML('measureOutcome','Esito',['Da verificare','Conforme','Non conforme','Non applicabile'],'Da verificare')}</div>
+  <div class="actions"><button id="vtp-measure-save" type="button" onclick="vtPro.addMeasure()">+ Registra misura</button><button id="vtp-measure-cancel" class="secondary" type="button" onclick="vtPro.cancelMeasure()" style="display:none">Annulla modifica</button></div>
+  ${p.measurements.length?`<table class="table"><tr><th>Prova / circuito</th><th>Risultato</th><th>Esito</th><th></th></tr>${p.measurements.map((x,i)=>`<tr><td>${escV(x.test)}<br>${escV(x.circuit)}</td><td>${escV(measureText(x))}</td><td>${escV(x.outcome)}</td><td><button class="secondary" type="button" onclick="vtPro.editMeasure(${i})">Modifica</button> <button class="secondary" type="button" onclick="vtPro.delMeasure(${i})">×</button></td></tr>`).join('')}</table>`:''}
   `);
 }
 function surveyHTML(){const p=store();return card('Sopralluogo guidato',`<p class="muted">Registra locali, apparecchi, matricole e foto direttamente dal telefono. Le immagini saranno conservate fra gli Allegati originali della pratica e potranno essere stampate.</p>
@@ -156,7 +169,7 @@ function inject(){
  }
 }
 const origRender=render;
-render=function(){origRender();inject();};
+render=function(){measureEdit=null;origRender();inject();};
 // Conserva una cronologia locale leggera dei metadati (non i file): NON sostituisce il backup cifrato esterno.
 const origSave=save;
 save=function(msg=true){origSave(msg);try{
@@ -193,7 +206,7 @@ function vtPrintableTable(headers,rows){return `<table><thead><tr>${headers.map(
 function printVtPart(){const p=store(), rows=[];
  if(p.surveys.length)rows.push('<h3>Sopralluoghi</h3>'+vtPrintableTable(['Data','Locale','Componenti','Matricole / note'],p.surveys.map(x=>[x.date,x.room,x.objects,[x.serial,x.notes].filter(Boolean).join(' · ')])));
  if(p.instruments.length)rows.push('<h3>Strumenti impiegati</h3>'+vtPrintableTable(['Strumento','Matricola','Taratura / note'],p.instruments.map(x=>[x.name,x.serial,[x.expiry,x.notes].filter(Boolean).join(' · ')])));
- if(p.measurements.length)rows.push('<h3>Misure registrate</h3>'+vtPrintableTable(['Data','Circuito / prova','Valore','Strumento / metodo','Esito'],p.measurements.map(x=>[x.date,[x.circuit,x.test].join(' / '),x.value+' '+x.unit,[x.instrument,x.method].filter(Boolean).join(' · '),x.outcome])));
+ if(p.measurements.length)rows.push('<h3>Misure registrate</h3>'+vtPrintableTable(['Data','Circuito / prova','Valore','Strumento / metodo','Esito'],p.measurements.map(x=>[x.date,[x.circuit,x.test].join(' / '),measureText(x),[x.instrument,x.method].filter(Boolean).join(' · '),x.outcome])));
  return rows.length?`<section class="print-section"><h2>Rapporto sopralluoghi e misurazioni</h2><p>Pratica ${escV(state.practiceNo)} · ${escV(state.client||'')}</p>${rows.join('')}<p>Data: ____________________ &nbsp;&nbsp; Firma del tecnico: ___________________________</p></section>`:'';
 }
 // Allegato operativo solo quando contiene dati; NON stampa avvisi sui requisiti Di.Ri.
@@ -208,8 +221,35 @@ window.vtPro={
  exportMappa(){const d={documento:state.doc,pratica:state.practiceNo,committente:state.client,cf_piva:state.clientTax,indirizzo:[state.address,state.city,state.province].filter(Boolean).join(', '),intervento:state.work,descrizione:state.workDescription,impresa:state.company,sede:state.companyAddress,piva:state.companyVat,registro:state.registryOffice,numero_iscrizione:state.registryNumber,tecnico:state.technician,dichiarante:state.issuerTechnician,luogo:state.dicoPlace,data:state.dicoDate};download('mappa_allegato_I_'+(state.practiceNo||'pratica')+'.json',JSON.stringify(d,null,2));},
  addInstrument(){if(store().locked)return toast('Apri una nuova revisione per modificare.');const name=get('instrumentName');if(!name)return toast('Inserisci il nome dello strumento.');store().instruments.push({name,serial:get('instrumentSerial'),expiry:get('instrumentExpiry'),notes:get('instrumentNotes')});update();},
  delInstrument(i){if(store().locked)return;if(!confirm('Rimuovere lo strumento?'))return;store().instruments.splice(i,1);update();},
- addMeasure(){if(store().locked)return;const test=get('measureTest'),value=get('measureValue');if(!test||!value)return toast('Indica prova e valore effettivamente misurato.');store().measurements.push({date:get('measureDate'),circuit:get('measureCircuit'),test,value,unit:get('measureUnit'),method:get('measureMethod'),instrument:get('measureInstrument'),outcome:get('measureOutcome')});update();},
- delMeasure(i){if(store().locked)return;if(!confirm('Rimuovere la misura?'))return;store().measurements.splice(i,1);update();},
+ editMeasure(i){
+  const p=store();if(p.locked||!p.measurements[i])return;
+  const x=p.measurements[i],n=normalizeMeasure(x.value,x.unit);
+  measureEdit={owner:state,record:x,index:i};
+  for(const [key,value] of Object.entries({measureDate:x.date,measureCircuit:x.circuit,measureTest:x.test,measureValue:n.value,measureUnit:n.unit,measureMethod:x.method,measureInstrument:x.instrument,measureOutcome:x.outcome||'Da verificare'})){
+   const node=document.getElementById('vtp-'+key);if(!node)continue;
+   if(key==='measureInstrument'&&value&&node.options&&![...node.options].some(o=>o.value===value)){const o=document.createElement('option');o.value=value;o.textContent=value+' (registro precedente)';node.appendChild(o);}
+   node.value=value||'';
+  }
+  document.getElementById('vtp-measure-save').textContent='Salva modifica';
+  document.getElementById('vtp-measure-cancel').style.display='';
+  document.getElementById('vtp-measure-heading')?.scrollIntoView({behavior:'smooth',block:'start'});
+ },
+ cancelMeasure(){measureEdit=null;render();},
+ addMeasure(){
+  const p=store();if(p.locked)return;
+  const test=get('measureTest'),raw=get('measureValue');
+  if(!test||!raw)return toast('Indica prova e valore effettivamente misurato.');
+  const n=normalizeMeasure(raw,get('measureUnit'));
+  const next={date:get('measureDate'),circuit:get('measureCircuit'),test,value:n.value,unit:n.unit,method:get('measureMethod'),instrument:get('measureInstrument'),outcome:get('measureOutcome')||'Da verificare'};
+  if(measureEdit){
+   const e=measureEdit;if(e.owner!==state||p.measurements[e.index]!==e.record){measureEdit=null;render();return toast('La misura o la pratica è cambiata. Riapri la misura da modificare.');}
+   if(!confirm('Salvare la modifica della misura registrata? Il valore precedente verrà conservato nello storico.'))return;
+   const old=p.measurements[e.index];
+   p.measurements[e.index]={...old,...next,editHistory:[...(old.editHistory||[]),{date:new Date().toISOString(),previous:Object.fromEntries(Object.keys(next).map(k=>[k,old[k]??'']))}]};
+  }else p.measurements.push(next);
+  measureEdit=null;resetMeasureApproval(p);update();
+ },
+ delMeasure(i){if(store().locked)return;if(!confirm('Rimuovere la misura?'))return;store().measurements.splice(i,1);measureEdit=null;resetMeasureApproval(store());update();},
  async addSurvey(){if(store().locked)return;const room=get('surveyRoom'),objects=get('surveyObjects');if(!room&&!objects)return toast('Inserisci almeno locale o componenti.');const files=[...(document.getElementById('vtp-surveyImages')?.files||[])];
   for(const f of files){if(!/^image\/(jpeg|png|webp)$/.test(f.type))return toast('Utilizza soltanto immagini JPG, PNG o WebP.');if(f.size>15*1024*1024)return toast('Ogni immagine deve pesare al massimo 15 MB.');}
   const photos=[],written=[];try{
