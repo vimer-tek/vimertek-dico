@@ -95,6 +95,9 @@ function form(){
  fields.map(x=>inp(x[0],x[1],x[2],d[x[0]]||(x[0]==='qty'?'1':''),d.type||'mt')).join('')+'</div>'+
  (editingId&&conflicts(d).length?'<p role="alert" style="color:#a32920"><b>Attenzione:</b> questa vecchia scheda contiene dati di altri tipi di apparecchio: '+esc(conflicts(d).map(k=>fields.find(x=>x[0]===k)[1]+': '+d[k]).join(' · '))+'. Trascrivili nelle schede separate. Al salvataggio verranno conservati nello storico, non nel simbolo di questo apparecchio.</p>':'')+
  '<label style="display:flex;align-items:center;gap:10px;flex-wrap:nowrap"><input style="width:auto;flex:none" data-vtdev="verified" type="checkbox"'+(d.verified&&!conflicts(d).length?' checked':'')+'> Confermo di aver controllato le caratteristiche dell’apparecchio e la sua installazione</label>';
+ if(editingId&&Array.isArray(d.previousMixedFields)&&d.previousMixedFields.length){
+  h+='<details><summary>Storico dati separati dalla scheda</summary>'+d.previousMixedFields.map(x=>'<p>'+esc(Object.entries(x.fields||{}).map(([k,v])=>(fields.find(f=>f[0]===k)?.[1]||k)+': '+v).join(' · '))+'</p>').join('')+'</details>';
+ }
  if(old.length){
   h+='<div class="grid"><label>Materiale già presente nella pratica<select id="vtdevice-material">'+opt('','Seleziona per copiare marca e modello','')+
   old.map((x,i)=>opt(String(i),[x.type,x.brand,x.model].filter(Boolean).join(' · '),'')).join('')+'</select></label>'+
@@ -249,6 +252,7 @@ const api={
   const x=(state.vtDevices||[]).filter(x=>!x.category||x.category==='Fotovoltaico')[Number(el.value)];if(!x)return;
   const b=root.querySelector('[data-vtdev="brand"]'),m=root.querySelector('[data-vtdev="model"]');
   if(b&&!b.value)b.value=x.brand||'';if(m&&!m.value)m.value=x.model||'';
+  const verified=root.querySelector('[data-vtdev="verified"]');if(verified)verified.checked=false;
   alert('Copia eseguita. Verifica che marca e modello corrispondano all’apparecchio prima di salvare.');
  }
 };
