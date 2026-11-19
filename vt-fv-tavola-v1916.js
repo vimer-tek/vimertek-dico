@@ -31,6 +31,7 @@ function issues(){
   if(Number(d.qty)!==1)out.push(d.tag+': registrare separatamente ogni apparecchio per rappresentarne il collegamento.');
  }
  for(const g of groups)if(g.list.length>6)out.push(g.id+': massimo 6 dispositivi per ramo nella tavola unica attuale; occorre un elaborato più esteso.');
+ for(const g of groups.filter(x=>['DC1','DC2','AC'].includes(x.id)&&(x.id!=='DC2'||count()===2))){if(!g.list.length)out.push(g.id+': registrare le protezioni effettive del ramo; questa topologia presuppone quadri DC/AC.');}
  for(const k of ['QDC','INV','QAC',...(storage()?['BAT']:[])]){
   if(!['si','no'].includes(pe()[k]))out.push('PE: specificare se il collegamento '+k+' → nodo PE è presente o non pertinente.');
  }
@@ -76,10 +77,12 @@ function symbol(x,y,d,c,vertical=false){
 }
 function drawPath(list,x1,x2,y,c,id){
  const n=Math.min(6,list.length),step=(x2-x1)/Math.max(1,n),slots=list.slice(0,n);
+ const confirmed=list.length>0&&list.length<=6&&list.every(d=>usable(d)&&d.verified===true);
+ const rail=(a,z)=>line(a,y,z,y,confirmed?c:'#9199a2',confirmed?'':'8 5');
  let s='',last=x1;
  for(let i=0;i<n;i++){
   const d=slots[i],x=x1+step*(i+.5),ok=usable(d),series=ok&&d.position==='serie';
-  if(series){s+=line(last,y,x-26,y,c)+symbol(x,y,d,c);last=x+26;}
+  if(series){s+=rail(last,x-26)+symbol(x,y,d,c);last=x+26;}
   else if(ok&&d.position==='derivazione'){
    s+=line(x,y,x,y+27,c)+'<circle cx="'+x+'" cy="'+y+'" r="4" fill="'+c+'"/>'+symbol(x,y+48,d,c,true)+line(x,y+74,x,y+83,c);
    // The endpoint is declared independently, never guessed from device type.
@@ -87,14 +90,14 @@ function drawPath(list,x1,x2,y,c,id){
    else s+=term(x,y+83,c);
    s+=multiline(x,y+115,d.tapTarget,Math.max(9,Math.floor(step/7.5)),2,12,'middle');
   }else{
-   s+=rect(x-26,y-12,52,24,'#969da6','white','5 4')+tx(x,y+4,'?',14,'bold','middle','#747e87');
+   s+=rail(last,x-26)+rect(x-26,y-12,52,24,'#969da6','white','5 4')+tx(x,y+4,'?',14,'bold','middle','#747e87');last=x+26;
   }
   s+=multiline(x,y-53,val(d.tag),Math.max(8,Math.floor(step/8)),1,15,'middle');
   s+=multiline(x,y-36,specs(d),Math.max(8,Math.floor(step/7)),2,12,'middle');
   if(series)s+=multiline(x,y+25,model(d),Math.max(8,Math.floor(step/7)),2,12,'middle');
  }
- s+=line(last,y,x2,y,c);
- if(!list.length)s+=tx((x1+x2)/2,y-15,'Apparecchi da registrare / verificare',14,'normal','middle','#666f79');
+ s+=rail(last,x2);
+ if(!list.length)s+=tx((x1+x2)/2,y-15,id==='BAT'?'Nessun dispositivo esterno registrato':'Apparecchi da registrare / verificare',14,'normal','middle','#666f79');
  if(list.length>6)s+=tx((x1+x2)/2,y+145,'Altri apparecchi non rappresentati: '+(list.length-6),14,'bold','middle','#a23b22');
  return s;
 }
@@ -133,7 +136,7 @@ function svg(reviewed){
  if(storage()){
   h+=block(25,671,240,150,'ACCUMULO',[val(state.vtPvAccumulo),val(state.vtPvAccumuloKwh)+' kWh',val(b('BAT','topologia'))],bat);
   h+=rect(320,635,565,222,bat,'#fefcff','8 5')+tx(335,660,'PROTEZIONI ACCUMULO · '+val(b('BAT','sez')),17,'bold','start',bat);
-  h+=wire(265,745,320,745,'batinv',bat)+drawPath(g[3].list,320,885,745,bat,'BAT')+
+  h+=wire(265,745,320,745,'batinv',bat)+(g[3].list.length?drawPath(g[3].list,320,885,745,bat,'BAT'):wire(320,745,885,745,'batinv',bat))+
    wire(885,745,1115,745,'batinv',bat)+wire(1115,745,1115,565,'batinv',bat)+labelCable(998,782,'batinv',26);
  }
  // PE endpoints are explicitly selected, no inference from free text.
