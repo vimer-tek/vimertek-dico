@@ -113,13 +113,13 @@ function svg(reviewed){
  // PV branch boxes, 2 DC lines never tied together.
  h+=block(25,160,215,126,'STRINGA FV1',[val(state.vtPvModuli),val(state.vtPvStringhe),val(b('ST1','mppt'))],dc);
  h+=rect(320,130,565,465,dc,'#fffdfd','8 5')+tx(335,153,'QDC · '+val(b('QDC','sigla')),19,'bold','start',dc);
- h+=tx(335,196,'Ramo FV1 → ingresso MPPT',16,'bold','start',dc);
+ h+=tx(335,177,'Ramo FV1 → ingresso MPPT',16,'bold','start',dc);
  h+=wire(240,250,320,250,'st1dc',dc)+labelCable(280,202,'st1dc',13);
  h+=drawPath(g[0].list,320,885,250,dc,'DC1');
  h+=wire(885,250,1000,250,'dc1inv',dc)+labelCable(942,202,'dc1inv',14);
  if(n===2){
   h+=block(25,395,215,126,'STRINGA FV2',[val(state.vtPvModuli),val(state.vtPvStringhe),val(b('ST2','mppt'))],dc);
-  h+=tx(335,431,'Ramo FV2 → ingresso MPPT',16,'bold','start',dc);
+  h+=tx(335,412,'Ramo FV2 → ingresso MPPT',16,'bold','start',dc);
   h+=wire(240,485,320,485,'st2dc',dc)+labelCable(280,437,'st2dc',13);
   h+=drawPath(g[1].list,320,885,485,dc,'DC2');
   h+=wire(885,485,1000,485,'dc2inv',dc)+labelCable(942,437,'dc2inv',14);
